@@ -48,7 +48,35 @@ func Debug(c *gin.Context) {
 
 //Test
 func Test(c *gin.Context) {
-	_test_loadbalance(c)
+	// reqZonelist := map[string]interface{}{
+	// 	"request":      "zonelist",
+	// 	"buildVersion": "5.0.3-4928-20190220-145206",
+	// 	"passwd":       "1",
+	// 	"user":         "local.k7",
+	// }
+	// _test_loadbalance(c, reqZonelist)
+
+	reqScreenum := map[string]interface{}{
+		"request":               "screennum",
+		"buildVersion":          "5.0.3-4968-20190404-172046",
+		"auto_login_server":     "",
+		"use_remote_app":        0,
+		"restart":               0,
+		"hostip":                "192.168.10.184",
+		"user_login_role":       "",
+		"zonename":              "zone1-保护区",
+		"user_login_desktop":    "",
+		"hostname":              "192.168.10.184",
+		"stop_intranet_desktop": 0,
+		"passwd":                "1",
+		"network_bw":            "LAN(100Mbps or higher)",
+		"geometry":              "1904x1002",
+		"client_ip":             "",
+		"usb_redirect":          1,
+		"user":                  "local.zx1",
+		"remote_app":            "",
+	}
+	_test_loadbalance(c, reqScreenum)
 }
 
 func _serveHTTP(c *gin.Context) {
@@ -61,16 +89,7 @@ func _serveHTTP(c *gin.Context) {
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
-func _test_loadbalance(c *gin.Context) {
-	req := map[string]interface{}{
-		"request":      "zonelist",
-		"buildVersion": "5.0.3-4928-20190220-145206",
-		"passwd":       "123456",
-		"user":         "local.zx1",
-		"zonename":     "zone1",
-		"hostname":     "192.168.10.33",
-	}
-
+func _test_loadbalance(c *gin.Context, req map[string]interface{}) {
 	bytesData, err := json.Marshal(req)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -98,5 +117,7 @@ func _test_loadbalance(c *gin.Context) {
 		return
 	}
 
-	c.Data(http.StatusOK, "application/json;charset=UTF-8", respBytes)
+	decryBytes := U.ECBDecrypt(respBytes)
+
+	c.Data(http.StatusOK, "application/json;charset=UTF-8", decryBytes)
 }

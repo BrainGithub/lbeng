@@ -19,10 +19,12 @@ type UserReq struct {
 	ClientVer string `json:"buildVersion"`
 	ClientIP  string `json:"clientip"`
 	//-----for allocate
-	DevIDs []string //Allocated dev id
-	IPs    []string //Allocated ip
-	Prots  []string //User defined protos
-	Pools  []string //User defined pools
+	DevIDs     []string //Allocated dev id
+	IPs        []string //Allocated ip
+	Prots      []string //User defined protos
+	Pools      []string //User defined pools
+	IsSharedVM bool     //shared VM
+	ImageIDs   []int    //image id
 }
 
 func _getProtocol() string {
@@ -42,8 +44,9 @@ func _getUserIDByUserName(uname string) (string, error) {
 	uid := ""
 	for rows.Next() {
 		rows.Scan(&uid)
+		lg.FmtInfo("uid:%s", uid)
 	}
-
+	lg.FmtInfo("uid:%s", uid)
 	return uid, nil
 }
 
@@ -66,7 +69,6 @@ func _getUserNameByUserID(uid string) (string, error) {
 }
 
 func (user *UserReq) alignUserMsg() error {
-	var tmp string
 	var err error
 
 	if user.Request == "" {
@@ -75,16 +77,17 @@ func (user *UserReq) alignUserMsg() error {
 		return errors.New(msg)
 	}
 
-	if user.LoginName != "" {
+	if user.LoginName != "" && user.UserID == "" {
+		var tmp string
 		tmp, err = _getUserIDByUserName(user.LoginName)
 		if err != nil {
 			return err
 		}
-		user.ZoneID = tmp
+		user.UserID = tmp
 	}
 
 	if user.ZoneName != "" && user.ZoneID == "" {
-		sql := fmt.Sprintf("select zone_id from tab_zones where zonename = '%s'", user.ZoneName)
+		sql := fmt.Sprintf("select zone_id from tab_zones where zone_name = '%s'", user.ZoneName)
 		rows, err := db.Raw(sql).Rows()
 		lg.FmtInfo("err:%s, sql：%s", err, sql)
 		if err != nil {
@@ -92,14 +95,13 @@ func (user *UserReq) alignUserMsg() error {
 			return err
 		}
 		defer rows.Close()
+		var tmp string
 		for rows.Next() {
 			rows.Scan(&tmp)
 		}
 		user.ZoneID = tmp
-	}
-
-	if user.ZoneName == "" && user.ZoneID != "" {
-		sql := fmt.Sprintf("select zonename from tab_zones where zone_id = '%s'", user.ZoneID)
+	} else if user.ZoneName == "" && user.ZoneID != "" {
+		sql := fmt.Sprintf("select zone_name from tab_zones where zone_id = %s", user.ZoneID)
 		rows, err := db.Raw(sql).Rows()
 		lg.FmtInfo("err:%s, sql：%s", err, sql)
 		if err != nil {
@@ -107,10 +109,13 @@ func (user *UserReq) alignUserMsg() error {
 			return err
 		}
 		defer rows.Close()
+		var tmp string
 		for rows.Next() {
 			rows.Scan(&tmp)
 		}
 		user.ZoneName = tmp
+	} else {
+		return nil
 	}
 
 	if user.Protocol == "" {
@@ -138,6 +143,7 @@ func (user *UserReq) authorize() error {
 //3. syncUser
 //4. authorize
 func UserReqMarshalAndVerify(ctx []byte, user *UserReq) error {
+	lg.FmtInfo("---%s", ctx)
 	err := json.Unmarshal(ctx, user)
 	if err != nil {
 		lg.Error(err.Error())
@@ -150,6 +156,19 @@ func UserReqMarshalAndVerify(ctx []byte, user *UserReq) error {
 		lg.Error(err.Error())
 		return err
 	}
+
+	lg.Info("userReq:")
+	lg.FmtInfo("Request:%s", user.Request)
+	lg.FmtInfo("LoginName:%s", user.LoginName)
+	lg.FmtInfo("UserID:%s", user.UserID)
+	lg.FmtInfo("Passwd:%s", user.Passwd)
+	lg.FmtInfo("ZoneName:%s", user.ZoneName)
+	lg.FmtInfo("ZoneID:%s", user.ZoneID)
+	lg.FmtInfo("Protocol:%s", user.Protocol)
+	lg.FmtInfo("ClientVer:%s", user.ClientVer)
+	lg.FmtInfo("ClientIP:%s", user.ClientIP)
+
+	lg.Info("userReq:%+v", *user)
 
 	return nil
 }

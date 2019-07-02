@@ -1,6 +1,7 @@
 package loadbalance
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -29,13 +30,17 @@ func _do(c *gin.Context) {
 
 	if err != nil {
 		lg.Error(err, err.Error())
-		c.JSON(
-			http.StatusOK,
-			gin.H{
-				"request":  usreq.Request,
-				"status":   "dispatch failed",
-				"comments": err.Error(),
-			})
+		edat := map[string]interface{}{
+			"request":  usreq.Request,
+			"status":   "dispatch failed",
+			"comments": err.Error(),
+		}
+		bytesData, err := json.Marshal(edat)
+		if err != nil {
+			lg.Error(err.Error())
+		}
+		encryted := U.ECBEncrypt(bytesData)
+		c.Data(http.StatusOK, "application/json; charset=UTF-8", encryted)
 	}
 	return
 }

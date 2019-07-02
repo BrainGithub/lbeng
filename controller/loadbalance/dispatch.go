@@ -17,39 +17,50 @@ func _counter() {
 
 }
 
-func _inner_vm_least_conn(ur *M.UserReq) error {
-	ur.GetInnerVMLeastConn()
-	return nil
+func _inner_vm_least_conn(ur *M.UserReq) (bool, error) {
+	return ur.GetInnerVMLeastConn()
 }
 
-func _inner_docker_least_conn(ur *M.UserReq) error {
-	return nil
+func _inner_docker_least_conn(ur *M.UserReq) (bool, error) {
+	return false, nil
 }
 
-func _extra_least_conn(ur *M.UserReq) error {
+func _extra_least_conn(ur *M.UserReq) (bool, error) {
 
-	return nil
+	return false, nil
 }
 
-func _normal_least_conn(ur *M.UserReq) error {
+func _normal_least_conn(ur *M.UserReq) (bool, error) {
 
-	return nil
+	return ur.NormalLeastConn()
 }
 
-func _checkOnline(ur *M.UserReq) error {
-	return nil
+func _checkOnline(ur *M.UserReq) (bool, error) {
+	return ur.IsHostOnline()
 }
 
 func weight_round_robin(ur *M.UserReq) error {
 	return nil
 }
 
-func hashMap(ur *M.UserReq) error {
-	return ur.GetLogedOnMapping()
+func hashMap(ur *M.UserReq) (bool, error) {
+	if ur.LoginName == "" || ur.ZoneName == "" || ur.Protocol == "" {
+		emsg := fmt.Sprintf("user name/zone or protocol missed:%+v", ur)
+		lg.Error(emsg)
+		return false, nil
+	}
+
+	found := false
+	err := ur.GetLogedOnMapping()
+	if err == nil && len(ur.IPs) > 0 {
+		found = true
+	}
+
+	return found, err
 }
 
-func leastConnection(ur *M.UserReq) error {
-	InnnerVM := []string{"DPD-Win", "DPD-Linux", "DPD-WINSVR"}
+func _doLeastConn(ur *M.UserReq) (bool, error) {
+	InnnerVM := []string{"DPD-WIN", "DPD-Linux", "DPD-WINSVR"}
 	InnnerDocker := []string{"DPD-ISP"}
 	ExternalVM := []string{"DPD-TM-Win", "DPD-GRA-TM", "SecureRDP", "XDMCP", "VNCProxy"}
 
@@ -57,8 +68,8 @@ func leastConnection(ur *M.UserReq) error {
 	prot := ur.Protocol
 	if prot == "" {
 		msg = "protocol is null"
-		lg.Error(msg)
-		return errors.New(msg)
+		lg.Info(msg)
+		return false, nil
 	}
 
 	//Inner vm process
@@ -84,7 +95,34 @@ func leastConnection(ur *M.UserReq) error {
 
 	msg = fmt.Sprintf("wrong protocol:%s", prot)
 	lg.Error(msg)
-	return errors.New(msg)
+	return false, errors.New(msg)
+}
+
+func leastConnection(ur *M.UserReq) (bool, error) {
+	found, err := _doLeastConn(ur)
+	lg.Info(found, err)
+	if err != nil {
+		return false, err
+	}
+
+	if found == false {
+		found, err = _normal_least_conn(ur)
+	}
+
+	return found, err
+}
+
+func sharedVMAlloc(ur *M.UserReq) (bool, error) {
+	if err := ur.CheckSharedVM(); err != nil {
+		return false, err
+	}
+
+	if !ur.IsSharedVM {
+		return false, nil
+	}
+
+	//is shared VM
+	return ur.GetSharedVMHost()
 }
 
 //to Dispatch,
@@ -95,16 +133,37 @@ func leastConnection(ur *M.UserReq) error {
 //   for multi nodes, return to user selection
 //3. only 1 node, HEAD on
 func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
-	//1.
-	if ur.Protocol == "" {
-		lg.Info("zero or multi protocols")
-		//return to user
-	}
-
-	//2.
-	if len(ur.IPs) != 1 {
-		lg.Info("zero or multi VM nodes:%s", ur.IPs)
+	len := len(ur.IPs)
+	//user not defined
+	if len == 0 {
 		//return
+		odat := map[string]interface{}{
+			"request":  ur.Request,
+			"status":   "dispatch failed",
+			"comments": "User not defined, please check configuration",
+		}
+		bytesData, err := json.Marshal(odat)
+		if err != nil {
+			lg.Error(err.Error())
+			return err
+		}
+		encryted := U.ECBEncrypt(bytesData)
+		c.Data(http.StatusOK, "application/json; charset=UTF-8", encryted)
+		return nil
+	} else if len > 1 {
+		odat := map[string]interface{}{
+			"request":  ur.Request,
+			"status":   "dispatch failed",
+			"comments": fmt.Sprintf("Multi nodes error:%s", ur.IPs),
+		}
+		bytesData, err := json.Marshal(odat)
+		if err != nil {
+			lg.Error(err.Error())
+			return err
+		}
+		encryted := U.ECBEncrypt(bytesData)
+		c.Data(http.StatusOK, "application/json; charset=UTF-8", encryted)
+		return nil
 	}
 
 	//3 HEAD on
@@ -116,7 +175,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	data := make(map[string]interface{})
 	json.Unmarshal(bytesCtx, &data)
 	data["clientip"] = c.ClientIP()
-	lg.Info(fmt.Sprintf("client request:%+v", data))
+	data["hostname"] = nodeip
 
 	lg.Info(fmt.Sprintf("json:%v", data))
 	bytesData, err := json.Marshal(data)
@@ -127,8 +186,8 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
 	url := fmt.Sprintf("http://%s:11900/", nodeip)
+	lg.FmtInfo("dispatch url:%s", url)
 	resp, err := http.Post(url, "application/json; charset=UTF-8", reader)
-	lg.Info(err, fmt.Sprintf("dispatch resp:%+v", resp))
 	if err != nil {
 		lg.Error(err.Error())
 		return err
@@ -143,64 +202,72 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 }
 
 //node allocation
-func _doAlloc(ur *M.UserReq) error {
+func _doAlloc(ur *M.UserReq) (bool, error) {
 	var err error
+	var found bool
+
+	//shared vm
+	found, err = sharedVMAlloc(ur)
+	if err != nil || found == true {
+		return found, err
+	}
 
 	//maping success, return
-	if err = hashMap(ur); err != nil {
-		//least connection
-		err = leastConnection(ur)
+	if found, err = hashMap(ur); err != nil || found == true {
+		return found, err
 	}
 
-	if err == nil && len(ur.IPs) == 0 {
-		ur.IPs = append(ur.IPs, "localhost")
+	//least connection
+	found, err = leastConnection(ur)
+	if err != nil {
+		return false, err
 	}
 
-	lg.Error(err, err.Error())
-
-	return err
-}
-
-//preAlloc, before allocate node, we do below things
-//1. get user defined protocols
-//2. check protocols
-//   a. if only 1 protocol, go on allocate
-//   b. if multi protocols, go back to user for selection
-func preAlloc(ur *M.UserReq) error {
-	if err := ur.GetProtocols(); err != nil {
-		return err
-	}
-
-	if len(ur.Prots) == 1 {
-		ur.Protocol = ur.Prots[0]
-	}
-
-	return nil
+	return found, err
 }
 
 func allocate(ur *M.UserReq) error {
 	var err error
-	if ur.LoginName != "" && ur.ZoneName != "" && ur.Protocol != "" {
-		emsg := fmt.Sprintf("user name/zone or protocol missed:%+v", ur)
-		lg.Error(emsg)
-		return nil
+	var found bool
+
+	Default_HOST := "192.168.10.184"
+
+	if ur.ZoneID == "" {
+		lg.FmtInfo("loginname:%s, ZoneID:%s, may be request zonelist", ur.LoginName, ur.ZoneID)
+		ur.IPs = append(ur.IPs, Default_HOST)
+	} else {
+		if err := ur.GetProtocolsAndPools(); err == nil {
+
+			len := len(ur.Prots)
+			switch len {
+			case 0:
+			case 1:
+				ur.Protocol = ur.Prots[0]
+				if found, err = _doAlloc(ur); err != nil {
+					return err
+				}
+
+				if found != true {
+					lg.Error("found nothing error, using localhost")
+					ur.IPs = append(ur.IPs, Default_HOST)
+				}
+			default:
+			}
+		}
 	}
 
-	if err = _doAlloc(ur); err == nil {
-		err = _checkOnline(ur)
-	}
-	lg.Error(err.Error())
 	return err
 }
 
 //Dispatch handler
 func dispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	var err error
-	if err = preAlloc(ur); err == nil {
-		if err = allocate(ur); err == nil {
-			err = _doDisp(c, bytesCtx, ur)
-		}
+
+	if err = allocate(ur); err != nil {
+		lg.Info(err.Error())
+		return err
 	}
 
-	return err
+	return _doDisp(c, bytesCtx, ur)
+
 }
