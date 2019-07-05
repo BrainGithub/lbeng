@@ -6,11 +6,9 @@ import (
 )
 
 //LogedOnMapping
-func (user *UserReq) GetLogedOnMapping() error {
-	var err error
-
+func (user *UserReq) GetLogedOnMapping() (found bool, err error) {
 	sql := fmt.Sprintf(
-		"select a.dev_id, a.hostname from tab_container_runtime a join tab_cluster b "+
+		"select distinct a.dev_id, a.hostname from tab_container_runtime a join tab_cluster b "+
 			"on a.dev_id = b.dev_id "+
 			"where b.type != 'backup' "+
 			"and b.online = 1 "+
@@ -22,10 +20,11 @@ func (user *UserReq) GetLogedOnMapping() error {
 		user.Protocol,
 		user.Protocol)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
-		return err
+		return
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -36,13 +35,13 @@ func (user *UserReq) GetLogedOnMapping() error {
 		}
 		user.DevIDs = append(user.DevIDs, devid)
 		user.IPs = append(user.IPs, ip)
+		found = true
 	}
 
-	return err
+	return
 }
 
-//GetInnerVMLeastConn
-func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
+func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
 	var err error
 	found := false
 	sql := fmt.Sprintf(
@@ -59,7 +58,8 @@ func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
 		user.ZoneID,
 		user.Pools[0])
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return false, err
@@ -76,12 +76,19 @@ func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
 		found = true
 	}
 
-	if found == true {
-		lg.Info("found:%s, %s", user.DevIDs, user.IPs)
-		return found, nil
+	lg.Info("found:%s, %s", user.DevIDs, user.IPs)
+	return found, nil
+}
+
+//GetInnerVMLeastConn
+func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
+	var found bool
+	var err error
+	if found, err = user.InnerVMLogedOnMaping(); found == true || err != nil {
+		return found, err
 	}
 
-	sql = fmt.Sprintf(
+	sql := fmt.Sprintf(
 		"select a.dev_id, a.ip, if(b.dev_id is null, 0, count(*)) as num "+
 			"from tab_cluster a left join tab_vm_runtime b "+
 			"on a.dev_id = b.dev_id "+
@@ -94,8 +101,9 @@ func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
 			"group by a.dev_id order by num limit 1",
 		user.ZoneID,
 		user.Pools[0])
-	rows, err = db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	rows, err := db.Raw(sql).Rows()
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return false, err
@@ -110,24 +118,82 @@ func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
 		user.DevIDs = append(user.DevIDs, devid)
 		user.IPs = append(user.IPs, ip)
 		found = true
-		lg.FmtInfo("found:%s, devid:%s, ip:%s", found, user.DevIDs, user.IPs)
+		lg.FmtInfo("found:%t, devid:%v, ip:%v", found, user.DevIDs, user.IPs)
 	}
 
 	return found, nil
+}
+
+//
+func (user *UserReq) _getLeaseConnStat(sql string) (bool, error) {
+	var found bool
+	rows, err := db.Raw(sql).Rows()
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
+	if err != nil {
+		lg.Error(err.Error())
+		return false, err
+	}
+	defer rows.Close()
+
+	var stat [][]interface{} //statistic
+	for rows.Next() {
+		var devid, ip, online, state string
+		var num int
+		if err := rows.Scan(&devid, &ip, &online, &state, &num); err != nil {
+			lg.Error("db error:%s", err.Error())
+			return false, err
+		}
+		user.DevIDs = append(user.DevIDs, devid)
+		user.IPs = append(user.IPs, ip)
+		found = true
+
+		//statistic for union query
+		var tmpVar []interface{} //vm variables slice
+		tmpVar = append(tmpVar, devid, ip, online, state, num)
+		stat = append(stat, tmpVar)
+	}
+
+	if found == true {
+		lg.FmtInfo("found:%t, [devid ip online state num]:%+v", found, stat)
+		user.Stat = stat
+	}
+
+	return found, nil
+}
+
+//GetInnerVMLeastConnStat
+//add statistic of idle onlined VM
+func (user *UserReq) GetInnerVMLeastConnStat() (bool, error) {
+	sql := fmt.Sprintf(
+		"select a.dev_id, a.ip, a.online, b.state if(b.dev_id is null, 0, count(*)) as num "+
+			"from tab_cluster a left join tab_vm_runtime b "+
+			"on a.dev_id = b.dev_id "+
+			"where a.type != 'backup' "+
+			"and a.online = 1 "+
+			"and b.login_name = '' "+
+			"and b.zone_id=%s "+
+			"and b.pool_id = '%s' "+
+			"group by a.dev_id order by b.state, num",
+		user.ZoneID,
+		user.Pools[0])
+
+	return user._getLeaseConnStat(sql)
 }
 
 func (user *UserReq) NormalLeastConn() (bool, error) {
 	var err error
 	found := false
 	sql := fmt.Sprintf(
-		"select a.dev_id, a.ip, if(b.dev_id is null, 0, count(*)) as num " +
+		"select a.dev_id, a.ip, a.online, b.state if(b.dev_id is null, 0, count(*)) as num " +
 			"from tab_cluster a left join tab_container_runtime b " +
 			"on a.dev_id = b.dev_id " +
 			"where a.type != 'backup' " +
 			"and a.online = 1 " +
 			"group by a.dev_id order by num limit 1")
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return false, err
@@ -147,6 +213,18 @@ func (user *UserReq) NormalLeastConn() (bool, error) {
 	return found, err
 }
 
+func (user *UserReq) NormalLeastConnStat() (bool, error) {
+	sql := fmt.Sprintf(
+		"select a.dev_id, a.ip, a.online, 0, if(b.dev_id is null, 0, count(*)) as num " +
+			"from tab_cluster a left join tab_container_runtime b " +
+			"on a.dev_id = b.dev_id " +
+			"where a.type != 'backup' " +
+			"and a.online = 1 " +
+			"group by a.dev_id order by num")
+
+	return user._getLeaseConnStat(sql)
+}
+
 func (user *UserReq) GetSharedVMHost() (bool, error) {
 	sql := fmt.Sprintf("select distinct a.dev_id, a.ip "+
 		"from tab_cluster a join tab_client_login_relation b join tab_vm_runtime c "+
@@ -157,7 +235,8 @@ func (user *UserReq) GetSharedVMHost() (bool, error) {
 		"and b.client_ip = '%s'",
 		user.ClientIP)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return false, err
@@ -192,7 +271,8 @@ func (user *UserReq) CheckSharedVM() error {
 		"and b.protocol = '%s'",
 		user.ZoneID, user.LoginName, user.Protocol)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return err
@@ -216,7 +296,8 @@ func (user *UserReq) CheckSharedVM() error {
 func (user *UserReq) IsHostOnline() (bool, error) {
 	sql := fmt.Sprintf("select online from tab_cluster where dev_id = '%s'", user.DevIDs[0])
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%s, sql：%s", err, sql)
+	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 	if err != nil {
 		lg.Error(err.Error())
 		return false, err
@@ -230,7 +311,7 @@ func (user *UserReq) IsHostOnline() (bool, error) {
 			return false, err
 		}
 	}
-	lg.FmtInfo("checkOnline:%v-%v, %t", user.DevIDs, user.IPs, online)
+	lg.FmtInfo("checkOnline:%+v-%+v, %t", user.DevIDs, user.IPs, online)
 	return online, err
 }
 
@@ -244,7 +325,8 @@ func (user *UserReq) GetProtocolsAndPools() error {
 			user.LoginName,
 			user.ZoneID)
 		rows, err := db.Raw(sql).Rows()
-		lg.FmtInfo("err:%s, sql：%s", err, sql)
+		lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 		if err != nil {
 			lg.Error(err.Error())
 			return err
@@ -260,18 +342,22 @@ func (user *UserReq) GetProtocolsAndPools() error {
 			user.Prots = append(user.Prots, prot)
 			user.Pools = append(user.IPs, poolId)
 		}
+		if len(user.Prots) == 1 {
+			user.Protocol = user.Prots[0]
+		}
 		lg.Info(user.Prots, user.Pools)
 	} else {
 		sql := fmt.Sprintf(
 			"select pool_id from tab_user_zone_applications "+
-				"where user = '%s' "+
+				"where loginname = '%s' "+
 				"and zone_id = %s "+
-				"and protocol = %s",
+				"and protocol = '%s'",
 			user.LoginName,
 			user.ZoneID,
 			user.Protocol)
 		rows, err := db.Raw(sql).Rows()
-		lg.FmtInfo("err:%s, sql：%s", err, sql)
+		lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
 		if err != nil {
 			lg.Error(err.Error())
 			return err

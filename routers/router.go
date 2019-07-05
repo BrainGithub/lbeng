@@ -28,6 +28,7 @@ func InitRouter() *gin.Engine {
 		broker.POST("/auth", api.GetAuth)
 		broker.POST("/upload", api.UploadImage)
 		broker.GET("/test", bs.Test)
+		broker.GET("/testdb", bs.TestDB)
 	}
 
 	return r

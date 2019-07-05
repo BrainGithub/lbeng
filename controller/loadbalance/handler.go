@@ -13,6 +13,9 @@ import (
 
 //Handle handler
 func Handle(c *gin.Context) {
+	counter.incrTotalCounter()
+	counter.incr("total client:" + c.ClientIP())
+
 	_do(c)
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	M "lbeng/models"
 	"lbeng/pkg/logging"
 	U "lbeng/pkg/utils"
 )
@@ -46,13 +47,35 @@ func Debug(c *gin.Context) {
 		})
 }
 
+func TestDB(c *gin.Context) {
+	var user M.UserReq
+	user.LoginName = "local.super"
+
+	tmp := map[string]interface{}{
+		"hello": "world",
+	}
+	ctx, err := json.Marshal(tmp)
+	if err != nil {
+		logging.Error(err.Error())
+	}
+	M.UserReqMarshalAndVerify(ctx, &user)
+
+	c.JSON(
+		http.StatusOK,
+		gin.H{
+			"message":      "broker server db test",
+			"status":       http.StatusOK,
+			user.LoginName: fmt.Sprintf("%+v", user),
+		})
+}
+
 //Test
 func Test(c *gin.Context) {
 	// reqZonelist := map[string]interface{}{
 	// 	"request":      "zonelist",
 	// 	"buildVersion": "5.0.3-4928-20190220-145206",
 	// 	"passwd":       "1",
-	// 	"user":         "local.k7",
+	// 	"user":         "local.test1",
 	// }
 	// _test_loadbalance(c, reqZonelist)
 
@@ -64,7 +87,8 @@ func Test(c *gin.Context) {
 		"restart":               0,
 		"hostip":                "192.168.10.184",
 		"user_login_role":       "",
-		"zonename":              "zone1-保护区",
+		"zonename":              "zone1",
+		"protocol":              "DPD-ISP",
 		"user_login_desktop":    "",
 		"hostname":              "192.168.10.184",
 		"stop_intranet_desktop": 0,
@@ -73,7 +97,7 @@ func Test(c *gin.Context) {
 		"geometry":              "1904x1002",
 		"client_ip":             "",
 		"usb_redirect":          1,
-		"user":                  "local.zx1",
+		"user":                  "local.k1",
 		"remote_app":            "",
 	}
 	_test_loadbalance(c, reqScreenum)
