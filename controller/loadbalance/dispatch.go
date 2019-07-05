@@ -57,41 +57,21 @@ func _union_least_conn_under_RaceCond(ur *M.UserReq) (found bool, err error) {
 	//2. 竞态查找最小连接
 	//how to do:
 	//InnerVM:     最大空闲 - 缓存已经使用的 = 可用空闲的，     求最大值并分配之
-	//Docker&外置: 已登录的 + 缓存已经使用的 = 已经或正在使用的，求最小值并分配之
+	//Docker&外置: 已登录的 + 缓存已经使用的 = 已经或正在使用的，求最小值并分配之, （数据库查询时取反，算法同上）
 	stat := ur.Stat //[][]string{devid, ip, online, vmstate, vmIdleNum}
 	var ip, devid string
-	leastNum := math.MaxInt32
+	idleNum := math.MinInt32
 
-	counter.lock.Lock()
 	for i, item := range stat {
 		hostip := item[1].(string)
 		num := item[4].(int)
 		num -= counter.C[hostip]
-		ur.Stat[i][2] = num //for tracking
-		if 0 < num && num < leastNum {
-			leastNum = num
-			if leastNum <= 0 {
-				found = false
-				lg.Error("no available pool")
-				break
-			} else {
-				ip = hostip
-				devid = item[0].(string)
-			}
+		ur.Stat[i][4] = num //for tracking
+		if idleNum < num {
+			idleNum = num
+			ip = hostip
+			devid = item[0].(string)
 		}
-	}
-	counter.lock.Unlock()
-
-	if found == false {
-		err = errors.New("No available pool now, please double check.")
-		return
-	}
-
-	found, err = ur.GetLogedOnMapping()
-	if err != nil || found == true {
-		//already logged on, return
-		lg.Info("after:%+v", *ur)
-		return
 	}
 
 	if ip != "" && devid != "" {
@@ -248,12 +228,7 @@ func _doAlloc(ur *M.UserReq) (bool, error) {
 	}
 
 	//least connection
-	found, err = leastConnection(ur)
-	if err != nil {
-		return false, err
-	}
-
-	return found, err
+	return leastConnection(ur)
 }
 
 func allocate(ur *M.UserReq) error {
@@ -354,6 +329,12 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 		lg.Error(err.Error())
 		return err
 	}
+
+	//Counter increase
+	lg.FmtInfo("before:%+v", *counter)
+	counter.incr(nodeip)
+	counter.incr("totalDispat-" + nodeip)
+
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
 	url := fmt.Sprintf("http://%s:11900/", nodeip)
@@ -368,17 +349,11 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	contentType := resp.Header.Get("Content-Type")
 	extraHeaders := map[string]string{}
 
-	//Counter increase
-	counter.incr(nodeip)
-	counter.incr("total dispat:" + nodeip)
-
-	lg.Info("before:%+v", counter)
-
 	c.DataFromReader(http.StatusOK, resp.ContentLength, contentType, resp.Body, extraHeaders)
 
 	//decrease
 	counter.decr(nodeip)
-	lg.Info("after:%+v", counter)
+	lg.FmtInfo("after:%+v", *counter)
 
 	return nil
 }

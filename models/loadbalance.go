@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	lg "lbeng/pkg/logging"
 )
@@ -20,7 +21,7 @@ func (user *UserReq) GetLogedOnMapping() (found bool, err error) {
 		user.Protocol,
 		user.Protocol)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+	lg.FmtInfo("err:%v, sql:%s", err, sql)
 
 	if err != nil {
 		lg.Error(err.Error())
@@ -45,20 +46,19 @@ func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
 	var err error
 	found := false
 	sql := fmt.Sprintf(
-		"select a.dev_id, a.ip, if(b.dev_id is null, 0, count(*)) as num "+
+		"select distinct a.dev_id, a.ip "+
 			"from tab_cluster a left join tab_vm_runtime b "+
 			"on a.dev_id = b.dev_id "+
 			"where a.type != 'backup' "+
 			"and a.online = 1 "+
 			"and b.login_name = '%s' "+
 			"and b.zone_id=%s "+
-			"and b.pool_id = '%s' "+
-			"group by a.dev_id order by num limit 1",
+			"and b.pool_id = '%s' ",
 		user.LoginName,
 		user.ZoneID,
 		user.Pools[0])
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+	lg.FmtInfo("err:%v, sql:%s", err, sql)
 
 	if err != nil {
 		lg.Error(err.Error())
@@ -67,7 +67,8 @@ func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var devid, ip string
-		if err := rows.Scan(&devid, &ip); err != nil {
+		var num int
+		if err := rows.Scan(&devid, &ip, &num); err != nil {
 			lg.Error("db error:%s", err.Error())
 			return false, err
 		}
@@ -76,7 +77,7 @@ func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
 		found = true
 	}
 
-	lg.Info("found:%s, %s", user.DevIDs, user.IPs)
+	lg.FmtInfo("found:%s, %s", user.DevIDs, user.IPs)
 	return found, nil
 }
 
@@ -125,10 +126,10 @@ func (user *UserReq) GetInnerVMLeastConn() (bool, error) {
 }
 
 //
-func (user *UserReq) _getLeaseConnStat(sql string) (bool, error) {
+func (user *UserReq) _getLeaseConnStat(sql string, inverse bool) (bool, error) {
 	var found bool
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+	lg.FmtInfo("err:%v, sql:%s", err, sql)
 
 	if err != nil {
 		lg.Error(err.Error())
@@ -149,6 +150,9 @@ func (user *UserReq) _getLeaseConnStat(sql string) (bool, error) {
 		found = true
 
 		//statistic for union query
+		if inverse {
+			num = -num
+		}
 		var tmpVar []interface{} //vm variables slice
 		tmpVar = append(tmpVar, devid, ip, online, state, num)
 		stat = append(stat, tmpVar)
@@ -166,7 +170,7 @@ func (user *UserReq) _getLeaseConnStat(sql string) (bool, error) {
 //add statistic of idle onlined VM
 func (user *UserReq) GetInnerVMLeastConnStat() (bool, error) {
 	sql := fmt.Sprintf(
-		"select a.dev_id, a.ip, a.online, b.state if(b.dev_id is null, 0, count(*)) as num "+
+		"select a.dev_id, a.ip, a.online, b.state, if(b.dev_id is null, 0, count(*)) as num "+
 			"from tab_cluster a left join tab_vm_runtime b "+
 			"on a.dev_id = b.dev_id "+
 			"where a.type != 'backup' "+
@@ -178,14 +182,14 @@ func (user *UserReq) GetInnerVMLeastConnStat() (bool, error) {
 		user.ZoneID,
 		user.Pools[0])
 
-	return user._getLeaseConnStat(sql)
+	return user._getLeaseConnStat(sql, false)
 }
 
 func (user *UserReq) NormalLeastConn() (bool, error) {
 	var err error
 	found := false
 	sql := fmt.Sprintf(
-		"select a.dev_id, a.ip, a.online, b.state if(b.dev_id is null, 0, count(*)) as num " +
+		"select a.dev_id, a.ip, a.online, b.state, if(b.dev_id is null, 0, count(*)) as num " +
 			"from tab_cluster a left join tab_container_runtime b " +
 			"on a.dev_id = b.dev_id " +
 			"where a.type != 'backup' " +
@@ -222,7 +226,7 @@ func (user *UserReq) NormalLeastConnStat() (bool, error) {
 			"and a.online = 1 " +
 			"group by a.dev_id order by num")
 
-	return user._getLeaseConnStat(sql)
+	return user._getLeaseConnStat(sql, true)
 }
 
 func (user *UserReq) GetSharedVMHost() (bool, error) {
@@ -235,7 +239,7 @@ func (user *UserReq) GetSharedVMHost() (bool, error) {
 		"and b.client_ip = '%s'",
 		user.ClientIP)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+	lg.FmtInfo("err:%v, sql:%s", err, sql)
 
 	if err != nil {
 		lg.Error(err.Error())
@@ -256,6 +260,9 @@ func (user *UserReq) GetSharedVMHost() (bool, error) {
 		found = true
 	}
 	lg.FmtInfo("sharedVM:%v, %v", user.DevIDs, user.IPs)
+	if !found {
+		err = errors.New("shared vm not configured")
+	}
 	return found, err
 }
 
@@ -271,7 +278,7 @@ func (user *UserReq) CheckSharedVM() error {
 		"and b.protocol = '%s'",
 		user.ZoneID, user.LoginName, user.Protocol)
 	rows, err := db.Raw(sql).Rows()
-	lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+	lg.FmtInfo("err:%v, sql:%s", err, sql)
 
 	if err != nil {
 		lg.Error(err.Error())

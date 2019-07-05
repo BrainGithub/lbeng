@@ -97,7 +97,7 @@ func Test(c *gin.Context) {
 		"geometry":              "1904x1002",
 		"client_ip":             "",
 		"usb_redirect":          1,
-		"user":                  "local.k1",
+		"user":                  "local.k2",
 		"remote_app":            "",
 	}
 	_test_loadbalance(c, reqScreenum)

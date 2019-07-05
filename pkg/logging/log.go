@@ -83,9 +83,10 @@ func Fatal(v ...interface{}) {
 
 // setPrefix set the prefix of the log output
 func setPrefix(level Level) {
-	_, file, line, ok := runtime.Caller(DefaultCallerDepth)
+	pc, file, line, ok := runtime.Caller(DefaultCallerDepth)
 	if ok {
-		logPrefix = fmt.Sprintf("[%s][%s:%d]", levelFlags[level], filepath.Base(file), line)
+		fun := filepath.Ext(runtime.FuncForPC(pc).Name())
+		logPrefix = fmt.Sprintf("[%s][%s%s:%d]", levelFlags[level], filepath.Base(file), fun, line)
 	} else {
 		logPrefix = fmt.Sprintf("[%s]", levelFlags[level])
 	}
