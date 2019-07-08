@@ -32,13 +32,13 @@ func (cnt *Counter) incr(k string) {
 
 func (cnt *Counter) incrTotalCounter() {
 	cnt.lock.Lock()
-	cnt.C["totalConn"]++
+	cnt.C["TotalConn"]++
 	cnt.lock.Unlock()
 }
 
 func (cnt *Counter) incrTotalReq() {
 	cnt.lock.Lock()
-	cnt.C["totalReq"]++
+	cnt.C["TotalReq"]++
 	cnt.lock.Unlock()
 }
 
@@ -61,11 +61,12 @@ func _union_least_conn_under_RaceCond(ur *M.UserReq) (found bool, err error) {
 	stat := ur.Stat //[][]string{devid, ip, online, vmstate, vmIdleNum}
 	var ip, devid string
 	idleNum := math.MinInt32
+	poolID := ur.Pools[0]
 
 	for i, item := range stat {
 		hostip := item[1].(string)
 		num := item[4].(int)
-		num -= counter.C[hostip]
+		num -= counter.C[poolID+hostip]
 		ur.Stat[i][4] = num //for tracking
 		if idleNum < num {
 			idleNum = num
@@ -235,21 +236,19 @@ func allocate(ur *M.UserReq) error {
 	var err error
 	var found bool
 
-	Default_HOST := "192.168.10.184"
+	DefaultHOST := "192.168.10.184"
 
 	if ur.ZoneID == "" {
 		lg.FmtInfo("loginname:%s, ZoneID:%s, may be request zonelist", ur.LoginName, ur.ZoneID)
-		ur.IPs = append(ur.IPs, Default_HOST)
+		ur.IPs = append(ur.IPs, DefaultHOST)
 	} else {
-		if err := ur.GetProtocolsAndPools(); err == nil {
-			if ur.LoginName != "" && ur.Protocol != "" && len(ur.Pools) > 0 {
-				if found, err = _doAlloc(ur); err != nil {
-					return err
-				}
-				if found != true {
-					lg.Error("found nothing error, using localhost")
-					ur.IPs = append(ur.IPs, Default_HOST)
-				}
+		if ur.LoginName != "" && ur.Protocol != "" && len(ur.Pools) > 0 {
+			if found, err = _doAlloc(ur); err != nil {
+				return err
+			}
+			if found != true {
+				lg.Error("found nothing error, using localhost")
+				ur.IPs = append(ur.IPs, DefaultHOST)
 			}
 		}
 	}
@@ -266,41 +265,18 @@ func allocate(ur *M.UserReq) error {
 //3. only 1 node, HEAD on
 func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	//allocated nodes ip num
-	userVMHostIPNum := len(ur.IPs)
+	hostIPNum := len(ur.IPs)
 	//user not defined
-	if userVMHostIPNum == 0 {
+	if hostIPNum == 0 || hostIPNum > 1 {
 		//user defined protocols
 		userDefinedProtocolsNum := len(ur.Prots)
 		var odat map[string]interface{}
-		if userDefinedProtocolsNum > 1 {
-			odat = map[string]interface{}{
-				"request":  ur.Request,
-				"status":   fmt.Sprintf("please select protocol:%v", ur.Prots),
-				"comments": "multi protocols, please make choice",
-			}
+		if userDefinedProtocolsNum == 0 {
+			odat = BuildMsgDisplay(ur, "No available resource pool to assign for this user!")
 		} else {
-			//return
-			odat = map[string]interface{}{
-				"request":  ur.Request,
-				"status":   "dispatch failed",
-				"comments": "User not defined, please check configuration",
-			}
+			odat = BuildMsgAutoLoginServer(ur)
 		}
 
-		bytesData, err := json.Marshal(odat)
-		if err != nil {
-			lg.Error(err.Error())
-			return err
-		}
-		encryted := U.ECBEncrypt(bytesData)
-		c.Data(http.StatusOK, "application/json; charset=UTF-8", encryted)
-		return nil
-	} else if userVMHostIPNum > 1 {
-		odat := map[string]interface{}{
-			"request":  ur.Request,
-			"status":   "dispatch failed",
-			"comments": fmt.Sprintf("User:%s has multi nodes error:%s", ur.LoginName, ur.IPs),
-		}
 		bytesData, err := json.Marshal(odat)
 		if err != nil {
 			lg.Error(err.Error())
@@ -320,7 +296,6 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	data := make(map[string]interface{})
 	json.Unmarshal(bytesCtx, &data)
-	data["clientip"] = c.ClientIP()
 	data["hostname"] = nodeip
 
 	lg.Info(fmt.Sprintf("json:%v", data))
@@ -331,9 +306,14 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	}
 
 	//Counter increase
-	lg.FmtInfo("before:%+v", *counter)
+	poolID := ""
+	if len(ur.Pools) > 0 {
+		poolID = ur.Pools[0]
+	}
+	counter.incr(poolID + nodeip)
 	counter.incr(nodeip)
-	counter.incr("totalDispat-" + nodeip)
+	counter.incr("TotalDispat-" + nodeip)
+	lg.FmtInfo("before:%+v", *counter)
 
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
@@ -353,6 +333,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	//decrease
 	counter.decr(nodeip)
+	counter.decr(poolID)
 	lg.FmtInfo("after:%+v", *counter)
 
 	return nil
@@ -362,6 +343,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 func dispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	var err error
 
+	ur.ClientIP = c.ClientIP()
 	if err = allocate(ur); err != nil {
 		lg.Info(err.Error())
 		return err

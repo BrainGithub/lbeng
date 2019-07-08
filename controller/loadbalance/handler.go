@@ -2,6 +2,7 @@ package loadbalance
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,9 +13,10 @@ import (
 )
 
 //Handle handler
-func Handle(c *gin.Context) {
+func Handler(c *gin.Context) {
 	counter.incrTotalCounter()
-	counter.incr("totalClient-" + c.ClientIP())
+	counter.incr("FromClient:" + c.ClientIP())
+	lg.FmtInfo("EntranceStat:%+v", *counter)
 
 	_do(c)
 }
@@ -26,6 +28,8 @@ func _do(c *gin.Context) {
 	rawdata, err := c.GetRawData()
 	if err == nil {
 		plainCtx := U.ECBDecrypt(rawdata)
+		ioutil.WriteFile(".debug.json", plainCtx, 0644) //for last connection debug
+
 		if err = M.UserReqMarshalAndVerify(plainCtx, &usreq); err == nil {
 			err = dispatch(c, plainCtx, &usreq)
 		}

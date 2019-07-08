@@ -8,15 +8,16 @@ import (
 
 //Idat, ISPClient request data, virtual table
 type UserReq struct {
-	Request   string `json:"request"`
-	LoginName string `json:"user"`
-	UserID    string `json:"userid"`
-	Passwd    string `json:"passwd"`
-	ZoneName  string `json:"zonename"`
-	ZoneID    string `json:"zoneid"`
-	Protocol  string `json:"protocol"`
-	ClientVer string `json:"buildVersion"`
-	ClientIP  string `json:"clientip"`
+	Request    string `json:"request"`
+	LoginName  string `json:"user"`
+	UserID     string `json:"userid"`
+	Passwd     string `json:"passwd"`
+	ZoneName   string `json:"zonename"`
+	ZoneID     string `json:"zoneid"`
+	Protocol   string `json:"protocol"`
+	ClientVer  string `json:"buildVersion"`
+	ClientIP   string `json:"clientip"`
+	Capability string `json:"capability"`
 	//-----for allocate
 	DevIDs     []string        //Allocated dev id
 	IPs        []string        //Allocated ip
@@ -27,8 +28,67 @@ type UserReq struct {
 	Stat       [][]interface{} //devid, ip, num list with ordered, for race cond
 }
 
-func _getProtocol() string {
-	return ""
+func (user *UserReq) getProtocolAndPools() error {
+	if user.Protocol == "" {
+		sql := fmt.Sprintf(
+			"select protocol, pool_id from tab_user_zone_applications "+
+				"where loginname = '%s' "+
+				"and zone_id = %s ",
+			user.LoginName,
+			user.ZoneID)
+		rows, err := db.Raw(sql).Rows()
+		lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
+		if err != nil {
+			lg.Error(err.Error())
+			return err
+		}
+
+		defer rows.Close()
+		for rows.Next() {
+			var prot, poolId string
+			if err := rows.Scan(&prot, &poolId); err != nil {
+				lg.Error("db error:%s", err.Error())
+				break
+			}
+			user.Prots = append(user.Prots, prot)
+			user.Pools = append(user.IPs, poolId)
+		}
+		lg.Info(user.Prots, user.Pools)
+
+		count := len(user.Prots)
+		if count == 1 {
+			user.Protocol = user.Prots[0]
+		} else if count > 1 {
+
+		}
+	} else {
+		sql := fmt.Sprintf(
+			"select pool_id from tab_user_zone_applications "+
+				"where loginname = '%s' "+
+				"and zone_id = %s "+
+				"and protocol = '%s'",
+			user.LoginName,
+			user.ZoneID,
+			user.Protocol)
+		rows, err := db.Raw(sql).Rows()
+		lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+
+		if err != nil {
+			lg.Error(err.Error())
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var poolid string
+			if err := rows.Scan(&poolid); err != nil {
+				lg.Error("db error:%s", err.Error())
+				break
+			}
+			user.Pools = append(user.Pools, poolid)
+		}
+	}
+	return nil
 }
 
 func _getUserIDByUserName(uname string) (string, error) {
@@ -79,6 +139,7 @@ func (user *UserReq) alignUserMsg() error {
 		user.UserID = tmp
 	}
 
+	found := false
 	if user.ZoneName != "" && user.ZoneID == "" {
 		sql := fmt.Sprintf("select zone_id from tab_zones where zone_name = '%s'", user.ZoneName)
 		rows, err := db.Raw(sql).Rows()
@@ -91,6 +152,7 @@ func (user *UserReq) alignUserMsg() error {
 		var tmp string
 		for rows.Next() {
 			rows.Scan(&tmp)
+			found = true
 		}
 		user.ZoneID = tmp
 	} else if user.ZoneName == "" && user.ZoneID != "" {
@@ -105,17 +167,21 @@ func (user *UserReq) alignUserMsg() error {
 		var tmp string
 		for rows.Next() {
 			rows.Scan(&tmp)
+			found = true
 		}
 		user.ZoneName = tmp
-	} else {
+	}
+
+	found = found
+
+	if user.ZoneID == "" || user.ZoneName == "" {
 		return nil
 	}
 
-	if user.Protocol == "" {
-		user.Protocol = _getProtocol()
-	}
+	//get protocols and Pools
+	err = user.getProtocolAndPools()
 
-	return nil
+	return err
 }
 
 func (user *UserReq) verifyPasswd() error {
