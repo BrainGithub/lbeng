@@ -37,7 +37,7 @@ func Init() {
 	log.Print("[info] logging.Init")
 	filePath := getLogFilePath()
 	fileName := getLogFileName()
-
+	log.Printf("[info] log file:%s/%s", filePath, fileName)
 	F, err = file.MustOpen(fileName, filePath)
 	if err != nil {
 		log.Fatalf("logging.Init err: %v", err)
