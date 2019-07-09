@@ -73,6 +73,7 @@ func MustOpen(fileName, filePath string) (*os.File, error) {
 	}
 
 	src := dir + "/" + filePath
+	src = filePath
 	perm := CheckPermission(src)
 	if perm == true {
 		return nil, fmt.Errorf("file.CheckPermission Permission denied src: %s", src)
