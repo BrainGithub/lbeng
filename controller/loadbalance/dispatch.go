@@ -317,7 +317,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
 	url := fmt.Sprintf("http://%s:%s/", nodeip, S.AppSetting.DefaultRedirectPort)
-	lg.FmtInfo("dispatch url:%s", url)
+	lg.FmtInfo("dispatch url:%s, data:%v", url, bytesData)
 	resp, err := http.Post(url, "application/json; charset=UTF-8", reader)
 	if err != nil {
 		lg.Error(err.Error())
