@@ -2,7 +2,6 @@ package logging
 
 import (
 	"fmt"
-	"time"
 
 	"lbeng/pkg/setting"
 )
@@ -14,9 +13,8 @@ func getLogFilePath() string {
 
 // getLogFileName get the save name of the log file
 func getLogFileName() string {
-	return fmt.Sprintf("%s%s.%s",
+	return fmt.Sprintf("%s.%s",
 		setting.AppSetting.LogSaveName,
-		time.Now().Format(setting.AppSetting.TimeFormat),
 		setting.AppSetting.LogFileExt,
 	)
 }
