@@ -297,7 +297,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	data := make(map[string]interface{})
 	json.Unmarshal(bytesCtx, &data)
-
+	data["client_ip"] = c.ClientIP()
 	lg.Info(fmt.Sprintf("json:%v", data))
 	bytesData, err := json.Marshal(data)
 	if err != nil {
