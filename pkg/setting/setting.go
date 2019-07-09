@@ -26,6 +26,9 @@ type App struct {
 	LogSaveName string
 	LogFileExt  string
 	TimeFormat  string
+
+	DefaultRedirectHost string
+	DefaultRedirectPort string
 }
 
 var AppSetting = &App{}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	M "lbeng/models"
 	lg "lbeng/pkg/logging"
+	S "lbeng/pkg/setting"
 	U "lbeng/pkg/utils"
 	"math"
 	"net/http"
@@ -236,7 +237,7 @@ func allocate(ur *M.UserReq) error {
 	var err error
 	var found bool
 
-	DefaultHOST := "192.168.10.184"
+	DefaultHOST := S.AppSetting.DefaultRedirectHost
 
 	if ur.ZoneID == "" {
 		lg.FmtInfo("loginname:%s, ZoneID:%s, may be request zonelist", ur.LoginName, ur.ZoneID)
@@ -317,7 +318,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
-	url := fmt.Sprintf("http://%s:11900/", nodeip)
+	url := fmt.Sprintf("http://%s:%s/", nodeip, S.AppSetting.DefaultRedirectPort)
 	lg.FmtInfo("dispatch url:%s", url)
 	resp, err := http.Post(url, "application/json; charset=UTF-8", reader)
 	if err != nil {
