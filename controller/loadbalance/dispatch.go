@@ -297,7 +297,6 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	data := make(map[string]interface{})
 	json.Unmarshal(bytesCtx, &data)
-	data["hostname"] = nodeip
 
 	lg.Info(fmt.Sprintf("json:%v", data))
 	bytesData, err := json.Marshal(data)
@@ -312,7 +311,6 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 		poolID = ur.Pools[0]
 	}
 	counter.incr(poolID + nodeip)
-	counter.incr(nodeip)
 	counter.incr("TotalDispat-" + nodeip)
 	lg.FmtInfo("before:%+v", *counter)
 
@@ -333,8 +331,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	c.DataFromReader(http.StatusOK, resp.ContentLength, contentType, resp.Body, extraHeaders)
 
 	//decrease
-	counter.decr(nodeip)
-	counter.decr(poolID)
+	counter.decr(poolID + nodeip)
 	lg.FmtInfo("after:%+v", *counter)
 
 	return nil
