@@ -13,6 +13,7 @@ import (
 
 	M "lbeng/models"
 	"lbeng/pkg/logging"
+	S "lbeng/pkg/setting"
 	U "lbeng/pkg/utils"
 )
 
@@ -133,7 +134,7 @@ func _test_loadbalance(c *gin.Context, req map[string]interface{}) (decryBytes [
 	}
 	encryBytes := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryBytes)
-	url := "http://localhost:11980/"
+	url := fmt.Sprintf("http://%s:%s/", S.AppSetting.DefaultRedirectHost, S.Server.HttpPort)
 	request, err := http.NewRequest("POST", url, reader)
 	if err != nil {
 		fmt.Println(err.Error())
