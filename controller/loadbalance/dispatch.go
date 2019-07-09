@@ -25,6 +25,12 @@ var counter = &Counter{
 	C: make(map[string]int),
 }
 
+func (cnt *Counter) Log() {
+	cnt.lock.Lock()
+	lg.FmtInfo("EntranceStat:%+v", *counter)
+	cnt.lock.Unlock()
+}
+
 func (cnt *Counter) incr(k string) {
 	cnt.lock.Lock()
 	cnt.C[k]++
@@ -312,7 +318,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	}
 	counter.incr(poolID + nodeip)
 	counter.incr("TotalDispat-" + nodeip)
-	lg.FmtInfo("before:%+v", *counter)
+	counter.Log()
 
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
@@ -332,7 +338,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	//decrease
 	counter.decr(poolID + nodeip)
-	lg.FmtInfo("after:%+v", *counter)
+	counter.Log()
 
 	return nil
 }

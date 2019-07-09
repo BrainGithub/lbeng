@@ -16,7 +16,7 @@ import (
 func Handler(c *gin.Context) {
 	counter.incrTotalCounter()
 	counter.incr("FromClient:" + c.ClientIP())
-	lg.FmtInfo("EntranceStat:%+v", *counter)
+	counter.Log()
 
 	_do(c)
 }
