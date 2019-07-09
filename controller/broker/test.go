@@ -134,7 +134,7 @@ func _test_loadbalance(c *gin.Context, req map[string]interface{}) (decryBytes [
 	}
 	encryBytes := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryBytes)
-	url := fmt.Sprintf("http://%s:%s/", S.AppSetting.DefaultRedirectHost, S.AppSetting.DefaultRedirectPort)
+	url := fmt.Sprintf("http://%s:%d/", S.AppSetting.DefaultRedirectHost, S.ServerSetting.HttpPort)
 	request, err := http.NewRequest("POST", url, reader)
 	if err != nil {
 		fmt.Println(err.Error())

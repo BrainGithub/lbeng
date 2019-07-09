@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -40,5 +41,13 @@ func main() {
 
 	log.Printf("[info] start http server listening %s", endPoint)
 
-	server.ListenAndServe()
+	// server.ListenAndServe()
+	l, err := net.Listen("tcp4", endPoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = server.Serve(l)
+	if err != nil {
+		panic(err)
+	}
 }
