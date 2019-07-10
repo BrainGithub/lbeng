@@ -32,7 +32,7 @@ const (
 )
 
 // Setup initialize the log instance
-func Init() {
+func Setup() {
 	var err error
 	log.Print("[info] logging.Init")
 	filePath := getLogFilePath()

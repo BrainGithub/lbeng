@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+//BuildMsgAutoLoginServer back to client
 func BuildMsgAutoLoginServer(user *M.UserReq) (odat map[string]interface{}) {
 
 	var info []interface{}
@@ -30,6 +31,7 @@ func BuildMsgAutoLoginServer(user *M.UserReq) (odat map[string]interface{}) {
 	return
 }
 
+//BuildMsgDisplay back to client
 func BuildMsgDisplay(user *M.UserReq, msg string) (odat map[string]interface{}) {
 	odat = map[string]interface{}{
 		"request":  user.Request,
@@ -42,6 +44,7 @@ func BuildMsgDisplay(user *M.UserReq, msg string) (odat map[string]interface{}) 
 	return
 }
 
+//BuildMsgZoneNameNotMatch back to client
 func BuildMsgZoneNameNotMatch(user *M.UserReq) (odat map[string]interface{}) {
 	odat = map[string]interface{}{
 		"request":  user.Request,

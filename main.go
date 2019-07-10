@@ -14,10 +14,10 @@ import (
 	"lbeng/routers"
 )
 
-func init() {
-	setting.Init()
-	logging.Init()
-	models.Init()
+func Setup() {
+	setting.Setup()
+	logging.Setup()
+	models.Setup()
 }
 
 func main() {

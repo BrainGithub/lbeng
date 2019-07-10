@@ -18,8 +18,10 @@ func InitRouter() *gin.Engine {
 
 	r.StaticFS("/upload/images", http.Dir(api.GetImageFullPath()))
 
+	//main handler
 	r.POST("/", lb.Handler)
 
+	//for test
 	broker := r.Group("/broker")
 	//broker.Use(jwt.JWT())
 	{
@@ -28,7 +30,6 @@ func InitRouter() *gin.Engine {
 		broker.POST("/auth", api.GetAuth)
 		broker.POST("/upload", api.UploadImage)
 
-		//test
 		broker.GET("/test", bs.Test)
 		broker.GET("/racingtestvm", bs.RacingTestVM)
 		broker.GET("/racingtestdocker", bs.RacingTestDocker)

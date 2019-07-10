@@ -152,7 +152,7 @@ func UploadImage(c *gin.Context) {
 		return
 	}
 
-	appG.Response(http.StatusOK, e.SUCCESS, map[string]string{
+	appG.Response(http.StatusOK, e.OK, map[string]string{
 		"image_url":      upload.GetImageFullUrl(imageName),
 		"image_save_url": savePath + imageName,
 	})

@@ -60,7 +60,7 @@ func decrypt(ciphertext []byte, key string) []byte {
 	return plaintext
 }
 
-// Padding补全
+// Padding补全' '
 func pPKCS7Pad(data []byte) []byte {
 	padding := aes.BlockSize - len(data)%aes.BlockSize
 	padtext := bytes.Repeat([]byte{byte(' ')}, padding)

@@ -22,8 +22,8 @@ type Model struct {
 }
 
 // Init initializes the database instance
-func Init() {
-	lg.Info("init start")
+func Setup() {
+	lg.Info("Setup start")
 
 	var err error
 	db, err = gorm.Open(setting.DatabaseSetting.Type,
@@ -34,7 +34,7 @@ func Init() {
 			setting.DatabaseSetting.Name))
 
 	if err != nil {
-		lg.Error("models.Init err:", err)
+		lg.Error("models.Setup err:", err)
 		panic(err)
 	}
 
@@ -52,7 +52,7 @@ func Init() {
 	db.DB().SetMaxOpenConns(100)
 	db.DB().SetConnMaxLifetime(time.Hour)
 
-	lg.Info("init end")
+	lg.Info("Setup end")
 }
 
 // CloseDB closes database connection (unnecessary)

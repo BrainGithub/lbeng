@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+//Counter for connection
 type Counter struct {
 	lock sync.Mutex // protects following fields
 	C    map[string]int
@@ -25,6 +26,7 @@ var counter = &Counter{
 	C: make(map[string]int),
 }
 
+//Log counter
 func (cnt *Counter) Log() {
 	cnt.lock.Lock()
 	lg.FmtInfo("EntranceStat:%+v", *counter)
@@ -57,7 +59,8 @@ func (cnt *Counter) decr(k string) {
 	cnt.lock.Unlock()
 }
 
-func _union_least_conn_under_RaceCond(ur *M.UserReq) (found bool, err error) {
+//getLeastConnUnderRaceCond
+func getLeastConnUnderRaceCond(ur *M.UserReq) (found bool, err error) {
 	lg.FmtInfo("befor:%+v", *ur)
 
 	//1. 数据库和增量缓存联合查询
@@ -97,9 +100,8 @@ func _union_least_conn_under_RaceCond(ur *M.UserReq) (found bool, err error) {
 //查找单pool的内置虚机的最小连接节点，docker除外
 //1. find the logged on mapping, if found return
 //2. statistic and sort the unlogged list, from database
-//3. query the unfinished connection
-//4. repeat step1, to sovle the scenario: the database changed between the step2 finished and the step3 finished
-func _inner_vm_least_conn(ur *M.UserReq) (found bool, err error) {
+//3. get least conn, union join the unfinished connection
+func innerVMLeastConn(ur *M.UserReq) (found bool, err error) {
 	// return ur.GetInnerVMLeastConn()
 	found, err = ur.InnerVMLogedOnMaping()
 	if err != nil || found == true {
@@ -112,19 +114,19 @@ func _inner_vm_least_conn(ur *M.UserReq) (found bool, err error) {
 		return
 	}
 
-	return _union_least_conn_under_RaceCond(ur)
+	return getLeastConnUnderRaceCond(ur)
 }
 
-func _inner_docker_least_conn(ur *M.UserReq) (bool, error) {
-	return false, nil
+//innerDockerLeastConn, for docker
+func innerDockerLeastConn(ur *M.UserReq) (bool, error) {
+	return defaultLeastConn(ur)
 }
 
-func _extra_least_conn(ur *M.UserReq) (bool, error) {
-
-	return false, nil
+func externalVMLeastConn(ur *M.UserReq) (bool, error) {
+	return defaultLeastConn(ur)
 }
 
-func _normal_least_conn(ur *M.UserReq) (found bool, err error) {
+func defaultLeastConn(ur *M.UserReq) (found bool, err error) {
 	lg.Info("after:%+v", *ur)
 	found, err = ur.NormalLeastConnStat()
 	if err != nil || found == false {
@@ -132,14 +134,14 @@ func _normal_least_conn(ur *M.UserReq) (found bool, err error) {
 		return
 	}
 
-	return _union_least_conn_under_RaceCond(ur)
+	return getLeastConnUnderRaceCond(ur)
 }
 
-func _checkOnline(ur *M.UserReq) (bool, error) {
+func checkOnline(ur *M.UserReq) (bool, error) {
 	return ur.IsHostOnline()
 }
 
-func weight_round_robin(ur *M.UserReq) error {
+func weightRoundRobin(ur *M.UserReq) error {
 	return nil
 }
 
@@ -153,7 +155,10 @@ func hashMap(ur *M.UserReq) (bool, error) {
 	return ur.GetLogedOnMapping()
 }
 
-func _doLeastConn(ur *M.UserReq) (bool, error) {
+//doLeastConn
+//1. inner
+//2. outer
+func doLeastConn(ur *M.UserReq) (bool, error) {
 	InnnerVM := []string{"DPD-WIN", "DPD-Linux", "DPD-WINSVR"}
 	InnnerDocker := []string{"DPD-ISP"}
 	ExternalVM := []string{"DPD-TM-Win", "DPD-GRA-TM", "SecureRDP", "XDMCP", "VNCProxy"}
@@ -169,21 +174,21 @@ func _doLeastConn(ur *M.UserReq) (bool, error) {
 	//Inner vm process
 	for _, v := range InnnerVM {
 		if v == prot {
-			return _inner_vm_least_conn(ur)
+			return innerVMLeastConn(ur)
 		}
 	}
 
 	//Inner Docker
 	for _, v := range InnnerDocker {
 		if v == prot {
-			return _inner_docker_least_conn(ur)
+			return innerDockerLeastConn(ur)
 		}
 	}
 
 	//External
 	for _, v := range ExternalVM {
 		if v == prot {
-			return _extra_least_conn(ur)
+			return externalVMLeastConn(ur)
 		}
 	}
 
@@ -192,18 +197,10 @@ func _doLeastConn(ur *M.UserReq) (bool, error) {
 	return false, errors.New(msg)
 }
 
-func leastConnection(ur *M.UserReq) (bool, error) {
-	found, err := _doLeastConn(ur)
+func leastConnection(ur *M.UserReq) (found bool, err error) {
+	found, err = doLeastConn(ur)
 	lg.Info(found, err)
-	if err != nil {
-		return false, err
-	}
-
-	if found == false {
-		found, err = _normal_least_conn(ur)
-	}
-
-	return found, err
+	return
 }
 
 func sharedVMAlloc(ur *M.UserReq) (bool, error) {
@@ -219,8 +216,11 @@ func sharedVMAlloc(ur *M.UserReq) (bool, error) {
 	return ur.GetSharedVMHost()
 }
 
-//node allocation
-func _doAlloc(ur *M.UserReq) (bool, error) {
+//_doAlloc
+//1. shared vm
+//2. hash map, logged on mapping
+//3. least connection
+func doAlloc(ur *M.UserReq) (bool, error) {
 	var err error
 	var found bool
 
@@ -239,6 +239,7 @@ func _doAlloc(ur *M.UserReq) (bool, error) {
 	return leastConnection(ur)
 }
 
+//allocate to do load balance, localhost as default
 func allocate(ur *M.UserReq) error {
 	var err error
 	var found bool
@@ -250,7 +251,7 @@ func allocate(ur *M.UserReq) error {
 		ur.IPs = append(ur.IPs, DefaultHOST)
 	} else {
 		if ur.LoginName != "" && ur.Protocol != "" && len(ur.Pools) > 0 {
-			if found, err = _doAlloc(ur); err != nil {
+			if found, err = doAlloc(ur); err != nil {
 				return err
 			}
 			if found != true {
@@ -263,14 +264,11 @@ func allocate(ur *M.UserReq) error {
 	return err
 }
 
-//to Dispatch,
-//do below 3 things:
-//1. check protocol
-//   multi or zero protocols, return to user selection
-//2. check return nodes
-//   for multi nodes, return to user selection
-//3. only 1 node, HEAD on
-func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
+//doDispatch
+//1. check protocol, multi or zero protocols, return to user selection
+//2. check return nodes, for multi nodes, return to user selection
+//3. HEAD on, to the only 1
+func doDispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	//allocated nodes ip num
 	hostIPNum := len(ur.IPs)
 	//user not defined
@@ -322,7 +320,7 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 
 	encryted := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryted)
-	url := fmt.Sprintf("http://%s:%s/", nodeip, S.AppSetting.DefaultRedirectPort)
+	url := fmt.Sprintf("%s%s:%s", S.AppSetting.PrefixUrl, nodeip, S.AppSetting.DefaultRedirectPort)
 	lg.FmtInfo("dispatch url:%s, data:%s", url, bytesData)
 	resp, err := http.Post(url, "application/json; charset=UTF-8", reader)
 	if err != nil {
@@ -344,6 +342,8 @@ func _doDisp(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 }
 
 //Dispatch handler
+//1. resource allocate
+//2. do dispatch request
 func dispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 	var err error
 
@@ -353,6 +353,5 @@ func dispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
 		return err
 	}
 
-	return _doDisp(c, bytesCtx, ur)
-
+	return doDispatch(c, bytesCtx, ur)
 }

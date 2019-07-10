@@ -17,7 +17,7 @@ import (
 	U "lbeng/pkg/utils"
 )
 
-//Help, broker server
+//Help can be used as alive test
 func Help(c *gin.Context) {
 	c.JSON(
 		http.StatusOK,
@@ -29,6 +29,7 @@ func Help(c *gin.Context) {
 	logging.Info()
 }
 
+//Debug for on lined last connection
 func Debug(c *gin.Context) {
 	temp, err := ioutil.ReadFile(".debug.json")
 	if err != nil {
@@ -37,7 +38,7 @@ func Debug(c *gin.Context) {
 	}
 	encryBytes := U.ECBEncrypt(temp)
 	reader := bytes.NewReader(encryBytes)
-	url := "http://localhost:11980/"
+	url := fmt.Sprintf("%s%s:%s", S.AppSetting.PrefixUrl, S.AppSetting.DefaultRedirectHost, S.AppSetting.DefaultRedirectPort)
 	resp, err := http.Post(url, "application/json; charset=UTF-8", reader)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"comments": err.Error()})
@@ -56,6 +57,7 @@ func Debug(c *gin.Context) {
 	return
 }
 
+//TestDB test database
 func TestDB(c *gin.Context) {
 	var user M.UserReq
 	user.LoginName = "local.super"
@@ -72,13 +74,13 @@ func TestDB(c *gin.Context) {
 	c.JSON(
 		http.StatusOK,
 		gin.H{
-			"message":      "broker server db test",
+			"message":      "query db local.super",
 			"status":       http.StatusOK,
 			user.LoginName: fmt.Sprintf("%+v", user),
 		})
 }
 
-//Test
+//Test portal
 func Test(c *gin.Context) {
 	// reqZonelist := map[string]interface{}{
 	// 	"request":      "zonelist",
@@ -110,13 +112,13 @@ func Test(c *gin.Context) {
 		"remote_app":            "",
 	}
 
-	decryBytes := _test_loadbalance(c, reqScreenum)
+	decryBytes := testLoadbalance(c, reqScreenum)
 
 	c.Data(http.StatusOK, "application/json;charset=UTF-8", decryBytes)
 	return
 }
 
-func _serveHTTP(c *gin.Context) {
+func serveHTTP(c *gin.Context) {
 	// http.Redirect(c.Writer, c.Request, "http://localhost:11980", http.StatusFound)
 	guest, err := url.Parse("http://localhost:11980")
 	if err != nil {
@@ -126,7 +128,7 @@ func _serveHTTP(c *gin.Context) {
 	proxy.ServeHTTP(c.Writer, c.Request)
 }
 
-func _test_loadbalance(c *gin.Context, req map[string]interface{}) (decryBytes []byte) {
+func testLoadbalance(c *gin.Context, req map[string]interface{}) (decryBytes []byte) {
 	bytesData, err := json.Marshal(req)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -134,7 +136,7 @@ func _test_loadbalance(c *gin.Context, req map[string]interface{}) (decryBytes [
 	}
 	encryBytes := U.ECBEncrypt(bytesData)
 	reader := bytes.NewReader(encryBytes)
-	url := fmt.Sprintf("http://%s:%d/", S.AppSetting.DefaultRedirectHost, S.ServerSetting.HttpPort)
+	url := fmt.Sprintf("%s%s:%s/", S.AppSetting.PrefixUrl, S.AppSetting.DefaultRedirectHost, S.ServerSetting.HttpPort)
 	request, err := http.NewRequest("POST", url, reader)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -158,6 +160,7 @@ func _test_loadbalance(c *gin.Context, req map[string]interface{}) (decryBytes [
 	return
 }
 
+//RacingTestVM for concurrency
 func RacingTestVM(c *gin.Context) {
 	reqScreenum := map[string]interface{}{
 		"request":               "screennum",
@@ -181,7 +184,7 @@ func RacingTestVM(c *gin.Context) {
 		"remote_app":            "",
 	}
 
-	decryBytes := _test_loadbalance(c, reqScreenum)
+	decryBytes := testLoadbalance(c, reqScreenum)
 
 	// for {
 	// 	time.Sleep(time.Second)
@@ -192,6 +195,7 @@ func RacingTestVM(c *gin.Context) {
 	return
 }
 
+//RacingTestDocker for concurrency
 func RacingTestDocker(c *gin.Context) {
 	reqScreenum := map[string]interface{}{
 		"request":           "screennum",
@@ -216,7 +220,7 @@ func RacingTestDocker(c *gin.Context) {
 		"capability":            "{\"ssh_tunnel\":1,\"rdp_proxy\":1}",
 	}
 
-	decryBytes := _test_loadbalance(c, reqScreenum)
+	decryBytes := testLoadbalance(c, reqScreenum)
 
 	// for {
 	// 	time.Sleep(time.Second)
@@ -227,6 +231,7 @@ func RacingTestDocker(c *gin.Context) {
 	return
 }
 
+//RacingTestShareVM for concurrency
 func RacingTestShareVM(c *gin.Context) {
 	reqScreenum := map[string]interface{}{
 		"request":               "screennum",
@@ -250,7 +255,7 @@ func RacingTestShareVM(c *gin.Context) {
 		"remote_app":            "",
 	}
 
-	decryBytes := _test_loadbalance(c, reqScreenum)
+	decryBytes := testLoadbalance(c, reqScreenum)
 
 	// for {
 	// 	time.Sleep(time.Second)

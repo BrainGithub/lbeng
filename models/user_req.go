@@ -127,6 +127,10 @@ func _getUserNameByUserID(uid string) (string, error) {
 	return str, nil
 }
 
+//alignUserMsg align user info
+//1. user name, id
+//2. zone name, id
+//3. protocol and VM resourse pool
 func (user *UserReq) alignUserMsg() error {
 	var err error
 
@@ -196,11 +200,8 @@ func (user *UserReq) authorize() error {
 	return nil
 }
 
-//UserVerify
-//1. verifyPasswd openam
-//2. alignUserMsg
-//3. syncUser
-//4. authorize
+//UserReqMarshalAndVerify marshal user request and do simple verify
+//序列化请求数据
 func UserReqMarshalAndVerify(ctx []byte, user *UserReq) (err error) {
 	lg.FmtInfo("%s", ctx)
 	err = json.Unmarshal(ctx, user)
@@ -209,7 +210,6 @@ func UserReqMarshalAndVerify(ctx []byte, user *UserReq) (err error) {
 		return
 	}
 
-	//2. alignUserMsg
 	err = user.alignUserMsg()
 	if err != nil {
 		lg.Error(err.Error())

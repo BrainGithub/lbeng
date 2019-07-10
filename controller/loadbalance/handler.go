@@ -12,17 +12,21 @@ import (
 	U "lbeng/pkg/utils"
 )
 
-//Handle handler
+//Handler portal
 func Handler(c *gin.Context) {
 	counter.incrTotalCounter()
 	counter.incr("FromClient:" + c.ClientIP())
 	counter.Log()
 
-	_do(c)
+	do(c)
 }
 
-//_do
-func _do(c *gin.Context) {
+//do, actual proc
+//1. 数据解密
+//2. 用户请求基础验证
+//3. 数据分发
+//4. 错误处理并返回
+func do(c *gin.Context) {
 	var usreq M.UserReq
 
 	rawdata, err := c.GetRawData()

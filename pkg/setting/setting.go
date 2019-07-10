@@ -35,7 +35,7 @@ var AppSetting = &App{}
 
 type Server struct {
 	RunMode      string
-	HttpPort     int
+	HttpPort     string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 }
@@ -74,7 +74,7 @@ func mapTo(section string, v interface{}) {
 }
 
 // Setup initialize the configuration instance
-func Init() {
+func Setup() {
 	var err error
 	log.Printf("[info] setting.Init")
 
