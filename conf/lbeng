@@ -1,0 +1,9 @@
+#/etc/logrotate.d/lbeng
+/usr/local/bin/lbeng.log {
+    missingok
+    notifempty
+    create
+    copytruncate
+    size 10M
+    rotate 5
+}

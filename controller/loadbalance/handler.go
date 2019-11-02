@@ -1,57 +1,77 @@
 package loadbalance
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
+    "github.com/gin-gonic/gin"
+    "io/ioutil"
+    "time"
 
-	"github.com/gin-gonic/gin"
+    M "lbeng/models"
+    lg "lbeng/pkg/logging"
+    U "lbeng/pkg/utils"
 
-	M "lbeng/models"
-	lg "lbeng/pkg/logging"
-	U "lbeng/pkg/utils"
+    vm "lbeng/func_device"
 )
+
+var cnt = U.GetCounter()
+
 
 //Handler portal
 func Handler(c *gin.Context) {
-	counter.incrTotalCounter()
-	counter.incr("FromClient:" + c.ClientIP())
-	counter.Log()
+    cnt.Incr("TotalConn")
+    cnt.Incr("FromClient:" + c.ClientIP())
 
-	do(c)
+    do(c)
 }
 
 //do, actual proc
-//1. 数据解密
-//2. 用户请求基础验证
-//3. 数据分发
-//4. 错误处理并返回
 func do(c *gin.Context) {
-	var usreq M.UserReq
+    var usreq M.UserReq
+    var rawdata []byte
+    var err error
 
-	rawdata, err := c.GetRawData()
-	if err == nil {
-		plainCtx := U.ECBDecrypt(rawdata)
-		ioutil.WriteFile(".debug.json", plainCtx, 0644) //for last connection debug
+    tstart := time.Now()
 
-		if err = M.UserReqMarshalAndVerify(plainCtx, &usreq); err == nil {
-			err = dispatch(c, plainCtx, &usreq)
-		}
-	}
+    if rawdata, err = c.GetRawData(); err != nil {
+        lg.Error(err.Error())
+        vm.BuildAndReturnMsg(c, &usreq, err.Error())
+        return
+    }
+    plainCtx := U.ECBDecrypt(rawdata)
+    err = ioutil.WriteFile(debugFile, plainCtx, 0644) //for last connection debug
+    if err != nil {
+        lg.Info(err.Error())
+    }
 
-	if err != nil {
-		lg.Error(err, err.Error())
-		edat := map[string]interface{}{
-			"request":  usreq.Request,
-			"status":   "dispatch failed",
-			"comments": err.Error(),
-		}
-		bytesData, err := json.Marshal(edat)
-		if err != nil {
-			lg.Error(err.Error())
-		}
-		encryted := U.ECBEncrypt(bytesData)
-		c.Data(http.StatusOK, "application/json; charset=UTF-8", encryted)
-	}
-	return
+    if err = M.UserReqMarshalAndVerify(plainCtx, &usreq); err != nil {
+        vm.BuildAndReturnMsg(c, &usreq, err.Error())
+        return
+    }
+
+    usreq.ClientIP = c.ClientIP()
+    doLoadBalance(c, plainCtx, &usreq)
+
+    elapsed := time.Since(tstart)
+    lg.FmtInfo("request elapsed:%s,%d,%s,%s,%d ms",
+        usreq.LoginName,
+        usreq.ZoneID,
+        usreq.Protocol,
+        usreq.Request,
+        elapsed/time.Millisecond)
+    return
+}
+
+//doLoadBalance do load balance ********************************************
+func doLoadBalance(c *gin.Context, bytesCtx []byte, ur *M.UserReq) {
+    i := vm.CreateInstance(c, bytesCtx, ur)
+
+    switch req, _ := i.Init(); req {
+    case vm.VERSION, vm.ZONELIST:
+        i.ZoneListDispatch()
+    case vm.SFTP:
+        i.SftpDispatch()
+    case vm.SCREENUM:
+        i.LoginDispatch()
+    default:
+        i.Dispatch()
+    }
 }

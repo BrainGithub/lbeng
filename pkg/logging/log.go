@@ -8,6 +8,9 @@ import (
 	"runtime"
 
 	"lbeng/pkg/file"
+	"lbeng/pkg/setting"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Level int
@@ -19,6 +22,7 @@ var (
 	DefaultCallerDepth = 2
 
 	logger     *log.Logger
+	loggerus   *logrus.Logger
 	logPrefix  = ""
 	levelFlags = []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 )
@@ -31,18 +35,36 @@ const (
 	FATAL
 )
 
+var logType = 2 //0: standard, 1: logrus
+
 // Setup initialize the log instance
 func Setup() {
-	var err error
 	log.Print("[info] logging.Init")
 	filePath := getLogFilePath()
 	fileName := getLogFileName()
 	log.Printf("[info] log file:%s/%s", filePath, fileName)
-	F, err = file.MustOpen(fileName, filePath)
+	f, err := file.MustOpen(fileName, filePath)
 	if err != nil {
 		log.Fatalf("logging.Init err: %v", err)
 	}
-	logger = log.New(F, DefaultPrefix, log.LstdFlags)
+
+	{
+		logger = log.New(f, DefaultPrefix, log.LstdFlags|log.Lmicroseconds)
+	}
+
+	{
+		fName := fileName + ".rus"
+		log.Printf("[info] log file:%s/%s", filePath, fName)
+		// file, _ := file.MustOpen(fName, filePath)
+		loggerus = logrus.New()
+		loggerus.SetOutput(os.Stdout)
+		loggerus.SetLevel(logrus.DebugLevel)
+		loggerus.SetFormatter(&logrus.JSONFormatter{})
+	}
+}
+
+func GetLogrus() *logrus.Logger {
+	return loggerus
 }
 
 // Debug output logs at debug level
@@ -69,6 +91,12 @@ func Warn(v ...interface{}) {
 	logger.Println(v)
 }
 
+// FmtError output logs at error level
+func FmtError(str string, v ...interface{}) {
+	setPrefix(ERROR)
+	logger.Println(fmt.Sprintf(str, v...))
+}
+
 // Error output logs at error level
 func Error(v ...interface{}) {
 	setPrefix(ERROR)
@@ -92,4 +120,17 @@ func setPrefix(level Level) {
 	}
 
 	logger.SetPrefix(logPrefix)
+}
+
+// getLogFilePath get the log file save path
+func getLogFilePath() string {
+	return fmt.Sprintf("%s", setting.AppSetting.LogSavePath)
+}
+
+// getLogFileName get the save name of the log file
+func getLogFileName() string {
+	return fmt.Sprintf("%s.%s",
+		setting.AppSetting.LogSaveName,
+		setting.AppSetting.LogFileExt,
+	)
 }
