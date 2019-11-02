@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"lbeng/func_device"
 	"log"
 	"net"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"lbeng/pkg/logging"
 	"lbeng/pkg/setting"
 	"lbeng/routers"
+	"lbeng/func_device"
 )
 
 func init() {

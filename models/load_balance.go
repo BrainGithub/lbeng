@@ -57,26 +57,14 @@ func (user *UserReq) GetProtocolAndPools() error {
 }
 
 func (user *UserReq) getProtocolAndPools() error {
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf(
-            "select a.protocol, a.pool_id, a.ip from tab_user_zone_applications a "+
-                "where upper(a.loginname) = upper('%s') "+
-                "and a.zone_id = %d "+
-                "and if('%s' = '', 1, '%s' = a.protocol)",
-            user.LoginName,
-            user.ZoneID,
-            user.Protocol, user.Protocol)
-    } else {
-        sql = fmt.Sprintf(
-            "select a.protocol, a.pool_id, a.ip from tab_user_zone_applications a "+
-                "where a.loginname = '%s' "+
-                "and a.zone_id = %d "+
-                "and if('%s' = '', 1, '%s' = a.protocol)",
-            user.LoginName,
-            user.ZoneID,
-            user.Protocol, user.Protocol)
-    }
+    sql := fmt.Sprintf(
+        "select a.protocol, a.pool_id, a.ip from tab_user_zone_applications a "+
+            "where a.loginname = '%s' "+
+            "and a.zone_id = %d "+
+            "and if('%s' = '', 1, '%s' = a.protocol)",
+        user.LoginName,
+        user.ZoneID,
+        user.Protocol, user.Protocol)
 
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
@@ -145,13 +133,18 @@ func (user *UserReq) getProtocolAndPools() error {
     return nil
 }
 
-func getUserIDByUserName(user *UserReq) (string, error) {
+func getUserIDByUserName(user *UserReq) (string, string, error) {
     uname := user.LoginName
     sql := ""
+    rawName := ""
+    uid := ""
+
+    user.caseIgnore = userNameCaseIgnore(uname)
+
     if user.caseIgnore {
-        sql = fmt.Sprintf("select user_id from tab_basic_users where upper(loginname) = upper('%s')", uname)
+        sql = fmt.Sprintf("select loginname, user_id from tab_basic_users where upper(loginname) = upper('%s')", uname)
     } else {
-        sql = fmt.Sprintf("select user_id from tab_basic_users where loginname = '%s'", uname)
+        sql = fmt.Sprintf("select loginname, user_id from tab_basic_users where loginname = '%s'", uname)
     }
 
     rows, err := db.Raw(sql).Rows()
@@ -159,15 +152,13 @@ func getUserIDByUserName(user *UserReq) (string, error) {
     defer rows.Close()
     if err != nil {
         lg.Error(err.Error())
-        return "", err
+        return "", "", err
     }
 
-    uid := ""
     for rows.Next() {
-        rows.Scan(&uid)
+        rows.Scan(&rawName, &uid)
     }
-    lg.FmtInfo("uid:%s", uid)
-    return uid, nil
+    return rawName, uid, nil
 }
 
 func getUserNameByUserID(uid string) (string, error) {
@@ -194,7 +185,7 @@ func userNameCaseIgnore(name string) bool {
     if len(arr) > 1 {
         ream := arr[0]
         switch strings.ToUpper(ream) {
-        case "LDAP", "AD":
+        case "LDAP", "AD", "LOCAL":
             return true
         }
     }
@@ -208,23 +199,22 @@ func userNameCaseIgnore(name string) bool {
 //3. protocol and VM resourse pool
 func (user *UserReq) alignUserMsg() error {
     var err error
+    var rawName, uid string
 
-    user.caseIgnore = userNameCaseIgnore(user.LoginName)
-
-    if user.LoginName != "" && user.UserID == "" {
-        var tmp string
-        tmp, err = getUserIDByUserName(user)
-        if err != nil {
-            return err
-        }
-        user.UserID = tmp
+    rawName, uid, err = getUserIDByUserName(user)
+    if err != nil {
+        lg.Error(rawName, uid, err.Error())
+        return err
     }
+    user.UserID = uid
+    user.LoginName = rawName
+    lg.Info("%+v", *user)
 
     found := false
     if user.ZoneName != "" && user.ZoneID == 0 {
         sql := fmt.Sprintf("select zone_id from tab_zones where zone_name = '%s'", user.ZoneName)
         rows, err := db.Raw(sql).Rows()
-        lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+        lg.FmtInfo("err:%v, sql:%s", err, sql)
         if err != nil {
             lg.Error(err.Error())
             return err
@@ -239,7 +229,7 @@ func (user *UserReq) alignUserMsg() error {
     } else if user.ZoneName == "" && user.ZoneID != 0 {
         sql := fmt.Sprintf("select zone_name from tab_zones where zone_id = %d", user.ZoneID)
         rows, err := db.Raw(sql).Rows()
-        lg.FmtInfo("err:%v, sql:%s, rows:%+v", err, sql, rows)
+        lg.FmtInfo("err:%v, sql:%s", err, sql)
         if err != nil {
             lg.Error(err.Error())
             return err
@@ -268,6 +258,18 @@ func (user *UserReq) alignUserMsg() error {
         return err
     }
 
+    return nil
+}
+
+func (user *UserReq) verifyPasswd() error {
+    return nil
+}
+
+func (user *UserReq) sync() error {
+    return nil
+}
+
+func (user *UserReq) authorize() error {
     return nil
 }
 
@@ -332,20 +334,12 @@ func UserReqMarshalAndVerify(ctx []byte, user *UserReq) (err error) {
 
 //GetDescription, GetDescription
 func (ur *UserReq) GetDescription(user string, zone int, p string, ip string) (desc string) {
-    sql := ""
-    if ur.caseIgnore {
-        sql = fmt.Sprintf("select b.description from tab_user_zone_applications a left join tab_auto_login_server b "+
-            "on a.pool_id = b.pool_id "+
-            "where upper(a.loginname) = upper('%s') and a.zone_id = %d and '%s' = a.protocol and b.ip = '%s'", user, zone, p, ip)
-    } else {
-        sql = fmt.Sprintf("select b.description from tab_user_zone_applications a left join tab_auto_login_server b "+
+    sql := fmt.Sprintf("select b.description from tab_user_zone_applications a left join tab_auto_login_server b "+
             "on a.pool_id = b.pool_id "+
             "where a.loginname = '%s' and a.zone_id = %d and '%s' = a.protocol and b.ip = '%s'", user, zone, p, ip)
-    }
 
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
-
     if err != nil {
         lg.Error(err.Error())
         return

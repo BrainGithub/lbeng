@@ -42,11 +42,11 @@ func doTask(c *gin.Context, bytesCtx []byte, br *M.BrokerRequest) {
 	i := vm.CreateInstance(c, bytesCtx, br)
 
 	switch req, _ := i.Init(); req {
-	case "zonelist":
+	case vm.ZONELIST:
 		i.ZoneList()
-	case "sftp":
+	case vm.SFTP:
 		// i.Sftp()
-	case "screennum":
+	case vm.SCREENUM:
 		// i.Login()
 	default:
 		lger.Error("request error:%s", req)
