@@ -8,24 +8,24 @@ import (
     U "lbeng/pkg/utils"
 )
 
-type ISPDevice struct {
+type DKDevice struct {
     base     *DPDevice
     destNode string
 }
 
-func (isp *ISPDevice) Init() (string, string) {
-    return isp.base.Init()
+func (dk *DKDevice) Init() (string, string) {
+    return dk.base.Init()
 }
 
 //ZoneListDispatch ZoneListDispatch
-func (isp *ISPDevice) ZoneListDispatch() {
-    isp.base.ZoneListDispatch()
+func (dk *DKDevice) ZoneListDispatch() {
+    dk.base.ZoneListDispatch()
 }
 
 //SftpDispatch request sftp
-func (isp *ISPDevice) SftpDispatch() {
-    base := isp.base
-    _, err := isp.alloc()
+func (dk *DKDevice) SftpDispatch() {
+    base := dk.base
+    _, err := dk.alloc()
     if err != nil {
         base.errorProcess(err, E.ERR_USR_SFTP)
         return
@@ -35,30 +35,30 @@ func (isp *ISPDevice) SftpDispatch() {
 }
 
 //LoginDispatch request screennum
-func (isp *ISPDevice) LoginDispatch() {
-    ur := isp.base.ur
+func (dk *DKDevice) LoginDispatch() {
+    ur := dk.base.ur
     if len(ur.Prots) == 0 {
         eCode := E.ERR_CFG_NO_AVAIL_POOL
-        isp.base.errorProcess(nil, eCode)
+        dk.base.errorProcess(nil, eCode)
     }
-    isp.reqScreenNum()
+    dk.reqScreenNum()
 }
 
-func (isp *ISPDevice) reqScreenNum() {
-    isp.dispatch()
+func (dk *DKDevice) reqScreenNum() {
+    dk.dispatch()
     return
 }
 
-func (isp *ISPDevice) alloc() (ip string, err error) {
-    base := isp.base
-    ur := isp.base.ur
+func (dk *DKDevice) alloc() (ip string, err error) {
+    base := dk.base
+    ur := dk.base.ur
 
     if M.PublicNetworkDetect() {
         lg.Info("do PublicNetworkDetect")
         if U.IsPublicNetwork(ur.ClientIP) {
             lg.Info("is PublicNetwork do default redirect")
-            isp.destNode = S.AppSetting.DefaultRedirectHost
-            ip = isp.destNode
+            dk.destNode = S.AppSetting.DefaultRedirectHost
+            ip = dk.destNode
             return
         }
     }
@@ -69,18 +69,18 @@ func (isp *ISPDevice) alloc() (ip string, err error) {
     }
 
     if !found {
-        isp.destNode = S.AppSetting.DefaultRedirectHost
+        dk.destNode = S.AppSetting.DefaultRedirectHost
     } else {
-        isp.destNode = base.ur.IPs[0]
+        dk.destNode = base.ur.IPs[0]
     }
 
-    ip = isp.destNode
+    ip = dk.destNode
     return
 }
 
-func (isp *ISPDevice) sftpAlloc() (ip string, err error) {
+func (dk *DKDevice) sftpAlloc() (ip string, err error) {
     ip = S.AppSetting.DefaultRedirectHost
-    ur := isp.base.ur
+    ur := dk.base.ur
     if len(ur.IPs) > 0 {
         ip = ur.IPs[0]
     }
@@ -88,13 +88,13 @@ func (isp *ISPDevice) sftpAlloc() (ip string, err error) {
 }
 
 //Dispatch Dispatch
-func (isp *ISPDevice) Dispatch() {
-    isp.dispatch()
+func (dk *DKDevice) Dispatch() {
+    dk.dispatch()
 }
 
-func (isp *ISPDevice) dispatch() {
-    base := isp.base
-    ip, err := isp.alloc()
+func (dk *DKDevice) dispatch() {
+    base := dk.base
+    ip, err := dk.alloc()
     if err != nil {
         lg.Error(err)
         return
@@ -104,11 +104,11 @@ func (isp *ISPDevice) dispatch() {
     base.doDispatch()
 }
 
-func (isp *ISPDevice) makeResponse() {
-    base := isp.base
+func (dk *DKDevice) makeResponse() {
+    base := dk.base
     base.makeResponse(nil)
 }
 
-func (isp *ISPDevice) ZoneList() {
-    isp.base.ZoneList()
+func (dk *DKDevice) ZoneList() {
+    dk.base.ZoneList()
 }

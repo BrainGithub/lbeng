@@ -2,7 +2,7 @@ package func_device
 
 import (
     "encoding/json"
-    "fmt"
+    "github.com/gin-gonic/gin"
     M "lbeng/models"
     E "lbeng/pkg/e"
     lg "lbeng/pkg/logging"
@@ -10,8 +10,6 @@ import (
     U "lbeng/pkg/utils"
     "net/http"
     "strings"
-
-    "github.com/gin-gonic/gin"
 )
 
 //IDPDevice interface has no-return, because when errored, there is web response
@@ -106,9 +104,7 @@ func (dev *DPDevice) Dispatch() {
 }
 
 func (dev *DPDevice) doDispatch() {
-    ha := M.GetHAIP(dev.nodeIP)
-    url := fmt.Sprintf("%s%s:%s", S.AppSetting.PrefixUrl, ha, S.AppSetting.DefaultRedirectPort)
-    err := vmRequest(dev.c, url, dev.ctx, dev.ur)
+    err := doDispatch(dev.c, dev.ctx, dev.ur)
     if err != nil {
         ecode := E.ERR_UNKNOWN
         if strings.Contains(err.Error(), "Client.Timeout exceeded") {
@@ -118,6 +114,7 @@ func (dev *DPDevice) doDispatch() {
         }
         dev.errorProcess(err, ecode)
     }
+    decrAllocCounter(dev.ur)
 }
 
 //broker request ---------------------------------------------------------
@@ -202,8 +199,8 @@ func CreateInstance(c *gin.Context, bytesCtx []byte, req interface{}) (ivm IDPDe
     }
 
     switch _, p := base.Init(); p {
-    case DPD_ISP:
-        ivm = &ISPDevice{base: base}
+    case DPD_DK:
+        ivm = &DKDevice{base: base}
     case DPD_LIN:
         ivm = &LinuxDevice{base: &InnerVMDevice{base: base}}
     case DPD_WIN, DPD_WIN_SVR:

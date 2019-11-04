@@ -132,7 +132,9 @@ func InnerDockerLeastConn(ur *M.UserReq) (found bool, err error) {
 //innerDockerLeastConn, for docker
 func innerDockerLeastConn(ur *M.UserReq) (found bool, err error) {
     found, err = ur.InnerDockerLogedOnMaping()
-    if err != nil || found == true {
+    if err != nil {
+        return
+    } else if found {
         //already logged on, return
         ur.LoggedOn = true
         return
@@ -478,6 +480,8 @@ func dispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
     err = doDispatch(c, bytesCtx, ur)
 
     decrAllocCounter(ur)
+
+    counter.Log("end disp")
 
     return err
 }

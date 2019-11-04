@@ -404,23 +404,7 @@ func (ur *UserReq) GetAutoLoginSvrIP(uname string, zid int, p string) (ips []str
 func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
     var err error
     found := false
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf(
-            "select distinct a.dev_id, a.ip "+
-                "from tab_cluster a left join tab_vm_runtime b "+
-                "on a.dev_id = b.dev_id "+
-                "where a.type != 'backup' "+
-                "and a.online = 1 "+
-                "and upper(b.login_name) = upper('%s') "+
-                "and b.zone_id = %d "+
-                "and b.pool_id = '%s' "+
-                "and b.state != 11",
-            user.LoginName,
-            user.ZoneID,
-            user.Pools[0])
-    } else {
-        sql = fmt.Sprintf(
+    sql := fmt.Sprintf(
             "select distinct a.dev_id, a.ip "+
                 "from tab_cluster a left join tab_vm_runtime b "+
                 "on a.dev_id = b.dev_id "+
@@ -433,7 +417,7 @@ func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
             user.LoginName,
             user.ZoneID,
             user.Pools[0])
-    }
+
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
 
@@ -461,22 +445,7 @@ func (user *UserReq) InnerVMLogedOnMaping() (bool, error) {
 func (user *UserReq) InnerDockerLogedOnMaping() (bool, error) {
     var err error
     found := false
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf(
-            "select distinct a.dev_id, a.ip "+
-                "from tab_cluster a left join tab_dock_runtime b "+
-                "on a.dev_id = b.dev_id "+
-                "where a.type != 'backup' "+
-                "and a.online = 1 "+
-                "and upper(b.login_name) = upper('%s') "+
-                "and b.zone_id = %d "+
-                "and b.pool_id = '%s' ",
-            user.LoginName,
-            user.ZoneID,
-            user.Pools[0])
-    } else {
-        sql = fmt.Sprintf(
+    sql := fmt.Sprintf(
             "select distinct a.dev_id, a.ip "+
                 "from tab_cluster a left join tab_dock_runtime b "+
                 "on a.dev_id = b.dev_id "+
@@ -488,7 +457,7 @@ func (user *UserReq) InnerDockerLogedOnMaping() (bool, error) {
             user.LoginName,
             user.ZoneID,
             user.Pools[0])
-    }
+
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
 
@@ -534,26 +503,7 @@ func (user *UserReq) GetInnerDockerLeastConnStat() (bool, error) {
 func (user *UserReq) OuterVMLogedOnMaping(table string, hostnameItem string) (bool, error) {
     var err error
     found := false
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf(
-            "select distinct a.dev_id, a.ip "+
-                "from tab_cluster a left join %s b "+
-                "on a.dev_id = b.dev_id "+
-                "where a.type != 'backup' "+
-                "and a.online = 1 "+
-                "and upper(b.user) = upper('%s') "+
-                "and b.zone_id = %d "+
-                "and b.pool_id = '%s' "+
-                "and b.%s = '%s'",
-            table,
-            user.LoginName,
-            user.ZoneID,
-            user.Pools[0],
-            hostnameItem,
-            user.AutoLS.IP)
-    } else {
-        sql = fmt.Sprintf(
+    sql := fmt.Sprintf(
             "select distinct a.dev_id, a.ip "+
                 "from tab_cluster a left join %s b "+
                 "on a.dev_id = b.dev_id "+
@@ -569,7 +519,7 @@ func (user *UserReq) OuterVMLogedOnMaping(table string, hostnameItem string) (bo
             user.Pools[0],
             hostnameItem,
             user.AutoLS.IP)
-    }
+
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
 
@@ -852,20 +802,7 @@ func (user *UserReq) GetSharedVMHost() (bool, error) {
 }
 
 func (user *UserReq) CheckSharedVM() error {
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf("select a.vm_stype, a.image_id from "+
-            "tab_auto_login_server a join tab_user_zone_applications b "+
-            "on a.zone_id = b.zone_id "+
-            "and a.protocol = b.protocol "+
-            "and a.pool_id = b.pool_id "+
-            "and a.image_id = b.image_id "+
-            "where b.zone_id = %d "+
-            "and upper(b.loginname) = upper('%s') "+
-            "and b.protocol = '%s'",
-            user.ZoneID, user.LoginName, user.Protocol)
-    } else {
-        sql = fmt.Sprintf("select a.vm_stype, a.image_id from "+
+    sql := fmt.Sprintf("select a.vm_stype, a.image_id from "+
             "tab_auto_login_server a join tab_user_zone_applications b "+
             "on a.zone_id = b.zone_id "+
             "and a.protocol = b.protocol "+
@@ -875,7 +812,6 @@ func (user *UserReq) CheckSharedVM() error {
             "and b.loginname = '%s' "+
             "and b.protocol = '%s'",
             user.ZoneID, user.LoginName, user.Protocol)
-    }
 
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
@@ -924,12 +860,8 @@ func (user *UserReq) IsHostOnline() (bool, error) {
 
 //GetHAIP GetHAIP
 func GetHAIP(ip string) string {
-    //for test return ip
-    lg.Info(ip)
-    return ip
-
-    if ip == "localhost" || ip == "127.0.0.1" {
-        return ip
+    if ip == "localhost" || ip == "127.0.0.1" || ip == "" {
+        return "127.0.0.1"
     }
 
     sql := fmt.Sprintf("select ha_ip from tab_cluster where ip = '%s'", ip)
@@ -998,25 +930,7 @@ func PublicNetworkDetect() (bflag bool) {
 }
 
 func (user *UserReq) ThisIsWrongJob(tab string, hostip string, guestitem string) {
-    sql := ""
-    if user.caseIgnore {
-        sql = fmt.Sprintf(
-            "delete from %s "+
-            "where hostname = '%s' "+
-            "and upper(user) = upper('%s') "+
-            "and zone_id = %d "+
-            "and protocol = '%s' "+
-            "and %s = '%s'",
-            tab,
-            hostip,
-            user.LoginName,
-            user.ZoneID,
-            user.Protocol,
-            guestitem,
-            user.AutoLS.IP,
-        )
-    } else {
-        sql = fmt.Sprintf(
+    sql := fmt.Sprintf(
             "delete from %s "+
             "where hostname = '%s' "+
             "and user = '%s' "+
@@ -1031,7 +945,6 @@ func (user *UserReq) ThisIsWrongJob(tab string, hostip string, guestitem string)
             guestitem,
             user.AutoLS.IP,
         )
-    }
 
     rows, err := db.Raw(sql).Rows()
     lg.FmtInfo("err:%v, sql:%s", err, sql)
