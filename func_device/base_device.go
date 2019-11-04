@@ -60,6 +60,7 @@ func (dev *DPDevice) Init() (string, string) {
 //ZoneListDispatch ZoneListDispatch
 func (dev *DPDevice) ZoneListDispatch() {
     dev.nodeIP = S.AppSetting.DefaultRedirectHost
+    dev.ur.IPs = []string {dev.nodeIP}
     dev.Dispatch()
 }
 

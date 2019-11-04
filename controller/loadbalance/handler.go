@@ -70,8 +70,8 @@ func doLoadBalance(c *gin.Context, bytesCtx []byte, ur *M.UserReq) {
     case vm.SFTP:
         i.SftpDispatch()
     case vm.SCREENUM:
-        i.LoginDispatch()
+        fallthrough
     default:
-        i.Dispatch()
+        i.LoginDispatch()
     }
 }
