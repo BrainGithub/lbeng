@@ -298,11 +298,17 @@ func UserReqMarshalAndVerify(ctx []byte, user *UserReq) (err error) {
                 }
                 lg.Info("get string protocol:", auto.Prot)
             case map[string]interface{}:
-                p, ok := autoLS.(map[string]interface{})["protocol"]
-                lg.FmtInfo("%s, %t", p, ok)
-                if ok {
-                    user.Protocol = p.(string)
-                }
+                val := autoLS.(map[string]interface{})["protocol"]
+                user.Protocol = val.(string)
+                user.AutoLS.Prot = val.(string)
+
+                val = autoLS.(map[string]interface{})["ip"]
+                user.AutoLS.IP = val.(string)
+
+                val = autoLS.(map[string]interface{})["domain"]
+                user.AutoLS.Domain = val.(string)
+
+                lg.FmtInfo("%+v", user.AutoLS)
             }
         }
     } else {
