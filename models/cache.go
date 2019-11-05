@@ -40,12 +40,13 @@ func setMapStatus(k string, val map[string]interface{}) error {
 		return nil
 	}
 
-	val["hello"] = 1
-	val["hello2"] = 2
+	var vv = make(map[string]interface{})
+	vv["hello"] = 1
+	vv["hello2"] = 2
 
 	var v = make(map[string]interface {})
-	v[k] = val
-	str, err := redb.HMSet(k, val).Result()
+	v[k] = vv
+	str, err := redb.HMSet(k, vv).Result()
 	lg.Info(str, err.Error())
 
 	return err
