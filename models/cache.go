@@ -28,6 +28,7 @@ func GetClusterFromCache() (clu cluster) {
 
 func SetClusterCache(v map[string]interface{}) error {
 	k := "cluster"
+	lg.FmtInfo("%+v", v)
 	return setMapStatus(k, v)
 }
 
