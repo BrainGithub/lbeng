@@ -154,11 +154,10 @@ func isClusterStable() (isCluster bool, stable bool, ha string) {
 
     _, _, ha = M.GetMasterIP()
     if ha == "" {
-        var clu = make(map[string]interface{})
-        clu["cluster"] = isCluster
-        clu["stable"] = stable
-        clu["result"] = false
-        clu["ha"] = ha
+        var clu M.Cluster
+        clu.IsCluster = isCluster
+        clu.IsStable = stable
+        clu.HA = ha
         M.SetClusterCache(clu)
         return
     }
@@ -191,8 +190,12 @@ func isClusterStable() (isCluster bool, stable bool, ha string) {
         stable = true
     }
 
-    ctnMap["ha"] = ha
-    M.SetClusterCache(ctnMap)
+    var clus M.Cluster
+    clus.IsCluster = isCluster
+    clus.IsStable = stable
+    clus.HA = ha
+    M.SetClusterCache(clus)
+
     return
 }
 

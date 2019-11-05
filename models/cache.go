@@ -12,6 +12,8 @@ type Cluster struct {
 	HA            string   `json:"ha"`
 }
 
+const TIMEOUT = 5
+
 
 func GetClusterFromCache() (clu Cluster) {
 	k := "cluster"
@@ -30,11 +32,8 @@ func SetClusterCache(v Cluster) (err error) {
 	k := "cluster"
 	lg.FmtInfo("%+v", v)
 
-	v.IsStable = true
-	v.HA = "1.1.1.1"
-
 	dat, _ := json.Marshal(v)
-	if err = redb.Do("SET", k, dat).Err(); err != nil {
+	if err = redb.Do("SET", k, dat, "EX", TIMEOUT).Err(); err != nil {
 		lg.Error(err.Error())
 	}
 
