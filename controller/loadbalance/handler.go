@@ -21,6 +21,8 @@ func Handler(c *gin.Context) {
     cnt.Incr("FromClient:" + c.ClientIP())
 
     do(c)
+
+    cnt.Log("cnt")
 }
 
 //do, actual proc

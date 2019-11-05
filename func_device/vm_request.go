@@ -4,9 +4,9 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
+    "io/ioutil"
     "net/http"
     "strconv"
-    "io/ioutil"
 
     "github.com/gin-gonic/gin"
 
@@ -138,17 +138,29 @@ func doVMRequest(c *gin.Context, baseUrl string, bytesCtx []byte, ur *M.UserReq)
 
 
 //is cluster stable
-func isClusterStable() (isCluster bool, stable bool) {
-    ha := ""
+func isClusterStable() (isCluster bool, stable bool, ha string) {
+    clu := M.GetClusterFromCache()
+    if clu.IsCluster && clu.IsStable {
+        ha = clu.HA
+        isCluster = clu.IsCluster
+        stable = clu.IsStable
+        return
+    }
+
     isCluster = !F.CheckNotExist("/license/ha_config")
     if !isCluster {
         return
-    } else {
-        _, _, ha := M.GetMasterIP()
-        if ha == "" {
-            stable = false
-            return
-        }
+    }
+
+    _, _, ha = M.GetMasterIP()
+    if ha == "" {
+        var clu = make(map[string]interface{})
+        clu["cluster"] = isCluster
+        clu["stable"] = stable
+        clu["result"] = false
+        clu["ha"] = ha
+        M.SetClusterCache(clu)
+        return
     }
 
     cmd := "cmd=cluster_state"
@@ -170,17 +182,6 @@ func isClusterStable() (isCluster bool, stable bool) {
         return
     }
 
-    /*
-    type clusterState struct {
-        cluster     bool `json:"cluster"`
-        stable      bool `json:"stable"`
-        result      bool `json:"result"`
-    }
-    var cState clusterState
-    err = json.Unmarshal(respBytes, &cState)
-    lg.FmtInfo("%s, %+v", err, cState)
-    */
-
     ctnMap := make(map[string]interface{})
     err = json.Unmarshal(respBytes, &ctnMap)
     lg.FmtInfo("%s, %+v", err, ctnMap)
@@ -190,6 +191,8 @@ func isClusterStable() (isCluster bool, stable bool) {
         stable = true
     }
 
+    ctnMap["ha"] = ha
+    M.SetClusterCache(ctnMap)
     return
 }
 

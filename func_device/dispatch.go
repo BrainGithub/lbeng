@@ -385,9 +385,9 @@ func doDispatch(c *gin.Context, bytesCtx []byte, ur *M.UserReq) error {
     }
 
     ha := "127.0.0.1"
-    if isClu, stable := isClusterStable(); isClu {
+    if isClu, stable, haIP := isClusterStable(); isClu {
         if stable {
-            ha = M.GetHAIP(nodeip)
+            ha = haIP
         } else {
             return errors.New("Cluster is not stable, please try later")
         }
