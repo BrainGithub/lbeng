@@ -28,7 +28,7 @@ func main() {
     log.Printf("[info] main")
 
     gin.SetMode(setting.ServerSetting.RunMode)
-    
+
     routersInit := routers.InitRouter()
     readTimeout := setting.ServerSetting.ReadTimeout
     writeTimeout := setting.ServerSetting.WriteTimeout

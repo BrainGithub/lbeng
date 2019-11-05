@@ -18,10 +18,12 @@ const TIMEOUT = 5
 func GetClusterFromCache() (clu Cluster) {
 	k := "cluster"
 
-	res, _ := redb.Do("GET", k).Result()
-	lg.FmtInfo("%+v", res)
-	if err := json.Unmarshal(res.([]byte), &clu); err != nil {
-		lg.Info(err.Error())
+	res, err := redb.Do("GET", k).Result()
+	lg.FmtInfo("%+v, %v", res, err)
+	if err == nil && res != nil {
+		if err := json.Unmarshal(res.([]byte), &clu); err != nil {
+			lg.Info(err.Error())
+		}
 	}
 	lg.FmtInfo("%+v", clu)
 
@@ -32,7 +34,12 @@ func SetClusterCache(v Cluster) (err error) {
 	k := "cluster"
 	lg.FmtInfo("%+v", v)
 
-	dat, _ := json.Marshal(v)
+	var dat []byte
+	dat, err = json.Marshal(v)
+	if err != nil {
+		return
+	}
+
 	if err = redb.Do("SET", k, dat, "EX", TIMEOUT).Err(); err != nil {
 		lg.Error(err.Error())
 	}
