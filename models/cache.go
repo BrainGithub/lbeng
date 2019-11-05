@@ -5,7 +5,7 @@ import (
 	lg "lbeng/pkg/logging"
 )
 
-type cluster struct {
+type Cluster struct {
 	IsCluster     bool     `json:"cluster"`
 	IsStable      bool     `json:"stable"`
 	IsResult      bool     `json:"result"`
@@ -13,12 +13,12 @@ type cluster struct {
 }
 
 
-func GetClusterFromCache() (clu cluster) {
+func GetClusterFromCache() (clu Cluster) {
 	k := "cluster"
 
-	res := redb.HGetAll(k).Val()
+	res, _ := redb.Do("GET", k).Result()
 	lg.FmtInfo("%+v", res)
-	if err := json.Unmarshal([]byte(res[k]), &clu); err != nil {
+	if err := json.Unmarshal(res.([]byte), &clu); err != nil {
 		lg.Info(err.Error())
 	}
 	lg.FmtInfo("%+v", clu)
@@ -26,28 +26,17 @@ func GetClusterFromCache() (clu cluster) {
 	return clu
 }
 
-func SetClusterCache(v map[string]interface{}) error {
+func SetClusterCache(v Cluster) (err error) {
 	k := "cluster"
 	lg.FmtInfo("%+v", v)
-	return setMapStatus(k, v)
-}
 
+	v.IsStable = true
+	v.HA = "1.1.1.1"
 
-
-func setMapStatus(k string, val map[string]interface{}) error {
-	if k == "" {
-		lg.Warn("null value")
-		return nil
+	dat, _ := json.Marshal(v)
+	if err = redb.Do("SET", k, dat).Err(); err != nil {
+		lg.Error(err.Error())
 	}
-
-	var vv = make(map[string]interface{})
-	vv["hello"] = 1
-	vv["hello2"] = 2
-
-	var v = make(map[string]interface {})
-	v[k] = vv
-	str, err := redb.HMSet(k, vv).Result()
-	lg.Info(str, err.Error())
 
 	return err
 }
