@@ -40,9 +40,7 @@ func setMapStatus(k string, val map[string]interface{}) error {
 	}
 
 	str, err := redb.HMSet(k, val).Result()
-	if err != nil {
-		lg.Info(str, err.Error())
-	}
+	lg.Info(str, err.Error())
 
 	return err
 }
