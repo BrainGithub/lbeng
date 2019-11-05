@@ -35,11 +35,16 @@ func SetClusterCache(v map[string]interface{}) error {
 
 
 func setMapStatus(k string, val map[string]interface{}) error {
-	if k == "" || val == nil {
+	if k == "" {
 		lg.Warn("null value")
 		return nil
 	}
 
+	val["hello"] = 1
+	val["hello2"] = 2
+
+	var v = make(map[string]interface {})
+	v[k] = val
 	str, err := redb.HMSet(k, val).Result()
 	lg.Info(str, err.Error())
 
