@@ -13,7 +13,7 @@ import (
 	"lbeng/pkg/logging"
 	"lbeng/pkg/setting"
 	"lbeng/routers"
-	"lbeng/func_device"
+	"lbeng/devices"
 )
 
 func init() {
@@ -21,7 +21,7 @@ func init() {
     logging.Setup()
     models.Setup()
 
-    func_device.InitSysLicense()
+    devices.InitSysLicense()
 }
 
 func main() {

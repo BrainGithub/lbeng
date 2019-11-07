@@ -1,7 +1,7 @@
 /*
 inner virtual machine
 */
-package func_device
+package devices
 
 type WinDevice struct {
     base *InnerVMDevice

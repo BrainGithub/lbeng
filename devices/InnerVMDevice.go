@@ -1,4 +1,4 @@
-package func_device
+package devices
 
 import (
     E "lbeng/pkg/e"

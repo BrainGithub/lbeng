@@ -1,6 +1,6 @@
 /* outer windows vm
  */
-package func_device
+package devices
 
 import (
     E "lbeng/pkg/e"

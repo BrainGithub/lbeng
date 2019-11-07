@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	vm "lbeng/func_device"
+	vm "lbeng/devices"
 	M "lbeng/models"
 	lg "lbeng/pkg/logging"
 	U "lbeng/pkg/utils"

@@ -19,10 +19,9 @@ func GetClusterFromCache() (clu Cluster) {
 	k := "cluster"
 
 	res, err := redb.Do("GET", k).String()
-	lg.FmtInfo("%+v, %v", res, err)
 	if err == nil {
 		if err := json.Unmarshal([]byte(res), &clu); err != nil {
-			lg.Info(err.Error())
+			lg.Error(err.Error(), res)
 		}
 	}
 	lg.FmtInfo("%+v", clu)

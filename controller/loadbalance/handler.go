@@ -9,7 +9,7 @@ import (
     lg "lbeng/pkg/logging"
     U "lbeng/pkg/utils"
 
-    vm "lbeng/func_device"
+    vm "lbeng/devices"
 )
 
 var cnt = U.GetCounter()

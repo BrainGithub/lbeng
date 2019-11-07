@@ -1,6 +1,6 @@
 /* outer Linux vm
  */
-package func_device
+package devices
 
 import (
     lg "lbeng/pkg/logging"
